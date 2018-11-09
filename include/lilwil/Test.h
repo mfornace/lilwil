@@ -1,10 +1,10 @@
 #pragma once
 #include "Context.h"
-#include <cpy/Signature.h>
+#include "Signature.h"
 
 namespace lilwil {
-using cpy::Pack;
-using cpy::Signature;
+using packs::Pack;
+using packs::Signature;
 
 /******************************************************************************/
 
@@ -22,7 +22,7 @@ template <class F, class=void>
 struct TestSignature : Pack<void, Context> {
     static_assert(std::is_invocable<F, Context>(),
         "Functor is not callable with implicit signature void(Context). "
-        "Specialize cpy::Signature<T> for your function or use a functor with a "
+        "Specialize packs::Signature<T> for your function or use a functor with a "
         "deducable (i.e. non-template, no auto) signature");
 };
 
@@ -41,7 +41,7 @@ Value value_invoke(F const &f, Context &c, Ts &&... ts) {
 }
 
 template <class T>
-std::decay_t<T> cast_index(ArgPack const &v, cpy::IndexedType<T> i) {
+std::decay_t<T> cast_index(ArgPack const &v, packs::IndexedType<T> i) {
     static_assert(std::is_convertible_v<std::decay_t<T>, T>);
     return v[i.index].template convert<std::decay_t<T>>();
 }
@@ -111,7 +111,6 @@ struct TestCase {
 };
 
 
-
 void add_test(TestCase t);
 
 template <class F>
@@ -122,7 +121,7 @@ void add_raw_test(std::string &&name, TestCaseComment &&c, F const &f, Vector<Ar
 
 template <class F>
 void add_test(std::string name, TestCaseComment c, F const &f, Vector<ArgPack> v={}) {
-    return add_raw_test(std::move(name), std::move(c), cpy::SimplifyFunction<F>()(f), std::move(v));
+    return add_raw_test(std::move(name), std::move(c), packs::SimplifyFunction<F>()(f), std::move(v));
 }
 
 /******************************************************************************/

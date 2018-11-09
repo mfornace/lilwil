@@ -37,7 +37,7 @@ message("whaahttt ${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 # Maybe change in future to user provided interface library?
 add_library(liblilwil STATIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/lilwil/Source.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/Source.cc
 )
 set_target_properties(liblilwil PROPERTIES OUTPUT_NAME lilwil ${LILWIL_STATIC_PROPERTIES})
 target_link_libraries(liblilwil PUBLIC lilwil_interface)
@@ -47,8 +47,8 @@ target_link_libraries(liblilwil PUBLIC lilwil_interface)
 # Module.cc has to be recompiled based on the exported module name
 # Could just build Python.cc as its own library, but here it's built together with Module.cc
 set_property(GLOBAL PROPERTY lilwil_module_files
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/lilwil/Python.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/lilwil/Module.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/Python.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/Module.cc
 )
 
 function(lilwil_module module_name)
@@ -73,4 +73,4 @@ endfunction(lilwil_module)
 add_library(testlilwil SHARED EXCLUDE_FROM_ALL source/Test.cc)
 set_property(TARGET testlilwil PROPERTY OUTPUT_NAME test)
 target_link_libraries(testlilwil PRIVATE liblilwil)
-lilwil_module(mymodule testlilwil)
+lilwil_module(lilwilmodule testlilwil)

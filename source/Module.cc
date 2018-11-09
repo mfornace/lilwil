@@ -25,6 +25,7 @@ static PyMethodDef lilwil_methods[] = {
     {"find_test",    (PyCFunction) lilwil_find_test,    METH_VARARGS,
         "Find the index of a unit test from its registered name (str)"},
     {"n_tests",      (PyCFunction) lilwil_n_tests,      METH_NOARGS,  "Number of registered tests (no arguments)"},
+    {"finalize",     (PyCFunction) lilwil_finalize,     METH_NOARGS,  "Clear static variables (no arguments)"},
     {"compile_info", (PyCFunction) lilwil_compile_info, METH_NOARGS,  "Compilation information (no arguments)"},
     {"test_names",   (PyCFunction) lilwil_test_names,   METH_NOARGS,  "Names of registered tests (no arguments)"},
     {"test_info",    (PyCFunction) lilwil_test_info,    METH_VARARGS, "Info of a registered test from its index (int)"},

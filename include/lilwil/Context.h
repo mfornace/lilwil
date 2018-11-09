@@ -3,7 +3,7 @@
 #include "Glue.h"
 #include "Value.h"
 
-#include <cpy/Signature.h>
+#include "Signature.h"
 #include <functional>
 #include <atomic>
 #include <chrono>

@@ -67,19 +67,6 @@ def pop_value(key, keys, values, default=None):
 
 ################################################################################
 
-class Suite:
-    def __init__(self, document):
-        obj = dict(document['objects'])
-        self.find_test = lambda n: 0
-        self.n_tests = obj['n_tests']
-        self.test_names = obj['test_names']
-        self.n_parameters = obj['n_parameters']
-        self.compile_info = obj['compile_info']
-        self.test_info = obj['test_info']
-        self.run_test = obj['run_test']
-        self.Function = document['Function']
-        self.add_value = obj['add_value']
-
 def import_library(lib, name=None):
     '''
     Import a module from a given shared library file name
@@ -102,13 +89,6 @@ def import_library(lib, name=None):
                 ret = importlib.util.module_from_spec(spec)
                 return ret
         raise e
-
-def import_suite(lib, name=None):
-    from lilwil.build import render_module
-    from lilwil import template
-    lib = import_library(lib, name)
-    [setattr(lib, k, getattr(template, k)) for k in dir(template) if not k.startswith('_')]
-    return Suite(render_module(lib.__name__, lib.document))
 
 ################################################################################
 
@@ -201,6 +181,8 @@ class MultiReport:
 
 def multireport(reports):
     '''Wrap multiple reports for C++ to look like they are one'''
+    if reports is None:
+        return None
     if len(reports) == 1:
         return reports[0]
     return MultiReport(reports)
@@ -222,8 +204,8 @@ def run_test(lib, index, test_masks, args=(), gil=False, cout=False, cerr=False)
         for r, mask in test_masks:
             stack.enter_context(r)
             [l.append(r) for m, l in zip(mask, lists) if m]
-        reports = [lib.Function() if r is None else lib.Function(multireport(r)) for r in lists]
-        return lib.run_test(index, reports, args, cout, cerr)
+        reports = tuple(map(multireport, lists))
+        return lib.run_test(index, reports, args, gil, cout, cerr)
 
 ################################################################################
 

@@ -12,6 +12,7 @@ extern "C" {
 PyObject * lilwil_run_test     (PyObject *, PyObject *);
 PyObject * lilwil_find_test    (PyObject *, PyObject *);
 PyObject * lilwil_n_tests      (PyObject *, PyObject *);
+PyObject * lilwil_finalize     (PyObject *, PyObject *);
 PyObject * lilwil_compile_info (PyObject *, PyObject *);
 PyObject * lilwil_test_names   (PyObject *, PyObject *);
 PyObject * lilwil_test_info    (PyObject *, PyObject *);

@@ -58,7 +58,7 @@ struct Ungluer<Glue<K, V>> {
 };
 
 template <class K, class V>
-struct AddKeyPairs<Value, Glue<K, V>> {
+struct AddKeyPairs<Glue<K, V>> {
     void operator()(LogVec &v, Glue<K, V> const &g) const {
         v.emplace_back(KeyPair{g.key, g.value});
     }
@@ -74,7 +74,7 @@ struct FileLine {
 inline constexpr auto file_line(char const *s, int i) {return FileLine{i, s};}
 
 template <>
-struct AddKeyPairs<Value, FileLine> {
+struct AddKeyPairs<FileLine> {
     void operator()(LogVec &v, FileLine const &g) const {
         v.emplace_back(KeyPair{"file", g.file});
         v.emplace_back(KeyPair{"line", static_cast<Integer>(g.line)});
@@ -91,9 +91,9 @@ template <class T>
 Comment<T> comment(T t, char const *s, int i) {return {t, {i, s}};}
 
 template <class T>
-struct AddKeyPairs<Value, Comment<T>> {
+struct AddKeyPairs<Comment<T>> {
     void operator()(LogVec &v, Comment<T> const &c) const {
-        AddKeyPairs<Value, FileLine>()(v, c.location);
+        AddKeyPairs<FileLine>()(v, c.location);
         v.emplace_back(KeyPair{"comment", c.comment});
     }
 };
@@ -113,7 +113,7 @@ ComparisonGlue<L const &, R const &> comparison_glue(L const &l, R const &r, cha
 }
 
 template <class L, class R>
-struct AddKeyPairs<Value, ComparisonGlue<L, R>> {
+struct AddKeyPairs<ComparisonGlue<L, R>> {
     void operator()(LogVec &v, ComparisonGlue<L, R> const &t) const {
         v.emplace_back(KeyPair{"__lhs", t.lhs});
         v.emplace_back(KeyPair{"__rhs", t.rhs});

@@ -206,9 +206,14 @@ PyObject *lilwil_run_test(PyObject *self, PyObject *args) {
 
 /******************************************************************************/
 
-PyObject *lilwil_n_tests(PyObject *, PyObject *args) {
-    Py_ssize_t n = lilwil::suite().size();
-    return Py_BuildValue("n", n);
+PyObject *lilwil_n_tests(PyObject *, PyObject *) {
+    return Py_BuildValue("n", static_cast<Py_ssize_t>(lilwil::suite().size()));
+}
+
+PyObject *lilwil_finalize(PyObject *, PyObject *) {
+    lilwil::suite().clear();
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 /******************************************************************************/

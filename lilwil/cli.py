@@ -1,6 +1,6 @@
 import typing
-from .common import Event, run_test, open_file, load_parameters, import_suite
-from .common import ExitStack, Suite, test_indices, parametrized_indices
+from .common import Event, run_test, open_file, load_parameters, import_library
+from .common import ExitStack, test_indices, parametrized_indices
 
 ################################################################################
 
@@ -61,7 +61,7 @@ def run_index(lib, masks, out, err, gil, cout, cerr, p):
     err.write(e)
     for r, _ in test_masks:
         r.finalize(val, time, counts, o, e)
-    return [1, time] + counts
+    return (1, time) + counts
 
 ################################################################################
 
@@ -87,7 +87,7 @@ def main(run=run_suite, lib='libwil', list=False, failure=False, success=False, 
     teamcity=None, json=None, json_indent=None, jobs=0, tests=None, params=None, skip=False):
     '''Main non-argparse function for running a subset of lilwil tests with given options'''
 
-    lib = import_suite(lib)
+    lib = import_library(lib)
     indices = test_indices(lib.test_names(), exclude, tests, regex)
     keypairs = tuple(parametrized_indices(lib, indices, load_parameters(params)))
 
