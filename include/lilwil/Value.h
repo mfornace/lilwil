@@ -43,7 +43,7 @@ public:
         return FromTarget<T>()(val);
     }
 
-    constexpr bool const has_value() const {return conv;}
+    constexpr bool has_value() const {return conv;}
 
     Value() = default;
 };
