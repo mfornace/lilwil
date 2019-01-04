@@ -94,7 +94,6 @@ class ConsoleTestReport(Report):
         self.file.flush()
 
     def __call__(self, event, scopes, logs):
-        event, scopes, logs = event.request(int), scopes.request(typing.List[str]), logs.request(typing.List[typing.Tuple[str, object]])
         self.write('\n', readable_message(self.events[event], scopes, logs, self.color.indent))
 
     def finalize(self, value, time, counts, out, err):

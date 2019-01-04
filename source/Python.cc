@@ -245,7 +245,7 @@ PyObject *lilwil_add_value(PyObject *, PyObject *args) {
     return lilwil::return_object([=] {
         lilwil::Value val;
         if (!lilwil::from_python(val, lilwil::Object(obj, true))) return lilwil::Object();
-        lilwil::add_test(lilwil::TestCase{s, {}, lilwil::ValueAdaptor{std::move(val)}, {}});
+        lilwil::add_test(lilwil::TestCase{s, {}, lilwil::ValueAdapter{std::move(val)}, {}});
         return lilwil::Object(Py_None, true);
     });
 }

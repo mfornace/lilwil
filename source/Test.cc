@@ -84,7 +84,7 @@ UNIT_TEST("test-3") = [](auto ct) {
 UNIT_TEST("test-4") = [](cpy::Context ct, goo const &) {
     // return goo();
     ct.equal(5, 5);
-    throw cpy::Skip("this test is skipped");
+    throw lilwil::Skip("this test is skipped");
 };
 
 void each(double) {}

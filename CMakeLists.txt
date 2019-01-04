@@ -63,7 +63,6 @@ function(lilwil_module module_name)
     endif()
 
     target_compile_definitions(${module_name} PRIVATE LILWIL_MODULE=${module_name})
-    message("hmm ${module_name} ")
     target_link_libraries(${module_name} PRIVATE lilwil_interface ${ARGN})
     target_include_directories(${module_name} PRIVATE ${LILWIL_PYTHON_INCLUDE})
 endfunction(lilwil_module)

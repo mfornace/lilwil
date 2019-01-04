@@ -29,7 +29,7 @@ Value get_value(std::string_view s) {
     auto it = std::find_if(cases.begin(), cases.end(), [=](auto const &c) {return c.name == s;});
     if (it == cases.end())
         throw std::runtime_error("Test case \"" + std::string(s) + "\" not found");
-    ValueAdaptor const *p = it->function.target<ValueAdaptor>();
+    ValueAdapter const *p = it->function.target<ValueAdapter>();
     if (!p)
         throw std::runtime_error("Test case \"" + std::string(s) + "\" is not a simple value");
     return p->value;

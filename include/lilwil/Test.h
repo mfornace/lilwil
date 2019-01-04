@@ -53,7 +53,7 @@ Pack<Ts...> skip_first_two(Pack<R, C, Ts...>);
 
 /// Basic wrapper to make C++ functor into a type erased std::function
 template <class F>
-struct TestAdaptor {
+struct TestAdapter {
     F function;
     using Sig = decltype(skip_first_two(TestSignature<F>()));
 
@@ -85,7 +85,7 @@ struct TestAdaptor {
 /******************************************************************************/
 
 /// Basic wrapper to make a fixed Variable into a std::function
-struct ValueAdaptor {
+struct ValueAdapter {
     Value value;
     Value operator()(Context &, ArgPack const &) const {return value;}
 };
@@ -116,7 +116,7 @@ void add_test(TestCase t);
 template <class F>
 void add_raw_test(std::string &&name, TestCaseComment &&c, F const &f, Vector<ArgPack> &&v) {
     if (TestSignature<F>::size <= 2 && v.empty()) v.emplace_back();
-    add_test(TestCase{std::move(name), std::move(c), TestAdaptor<F>{f}, std::move(v)});
+    add_test(TestCase{std::move(name), std::move(c), TestAdapter<F>{f}, std::move(v)});
 }
 
 template <class F>
