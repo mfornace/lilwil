@@ -31,7 +31,6 @@ endif()
 add_library(lilwil_interface INTERFACE)
 target_compile_features(lilwil_interface INTERFACE cxx_std_17)
 target_include_directories(lilwil_interface INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-message("whaahttt ${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 ################################################################################
 
