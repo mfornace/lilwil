@@ -4,7 +4,7 @@ from .common import ExitStack, test_indices, parametrized_indices
 
 ################################################################################
 
-def parser(prog='lilwil', lib='libwil', description='Run C++ unit tests from Python with the lilwil library', **kwargs):
+def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ unit tests from Python with the lilwil library', **kwargs):
     '''
     Return an ArgumentParser for lilwil tests. Parameters:
         prog: program name that is shown with --help
@@ -19,7 +19,7 @@ def parser(prog='lilwil', lib='libwil', description='Run C++ unit tests from Pyt
     p = ArgumentParser(prog=prog, description=description, **kwargs)
     s(p, '--list',               '-l', help='list all test names')
     o(p, str, 'PATH', '--lib',   '-a', help='file path for test library (default %s)' % repr(lib), default=str(lib))
-    o(p, int, 'INT', '--jobs',   '-j', help='number of job threads (default 1; 0 for jobs to run in main thread)', default=1)
+    o(p, int, 'INT', '--jobs',   '-j', help='# of threads (default %d; 0 to use only main thread)' % jobs, default=jobs)
     o(p, str, 'STR', '--params', '-p', help='JSON file path or Python eval-able parameter string')
     o(p, str, 'RE',  '--regex',  '-r', help="specify tests with names matching a given regex")
     s(p, '--exclude',            '-x', help='exclude rather than include specified cases')
@@ -28,7 +28,7 @@ def parser(prog='lilwil', lib='libwil', description='Run C++ unit tests from Pyt
     o(p, str, '', 'tests', nargs='*',  help='test names (if not given, specifies all tests)')
 
     t = p.add_argument_group('output options')
-    s(t, '--quiet',            '-q', help='prevent command line output (from lilwil at least)')
+    s(t, '--quiet',            '-q', help='prevent command line output (at least from Python)')
     s(t, '--failure',          '-f', help='show failures')
     s(t, '--success',          '-s', help='show successes')
     s(t, '--exception',        '-e', help='show exceptions')
@@ -40,12 +40,12 @@ def parser(prog='lilwil', lib='libwil', description='Run C++ unit tests from Pyt
     o(t, str, 'MODE', '--out-mode',  help="output file open mode (default 'w')", default='w')
 
     r = p.add_argument_group('reporter options')
-    o(r, str, 'PATH', '--xml',         help="XML file path")
-    o(r, str, 'MODE', '--xml-mode',    help="XML file open mode (default 'a+b')", default='a+b')
-    o(r, str, 'NAME', '--suite',       help="test suite output name (default 'lilwil')", default='lilwil')
-    o(r, str, 'PATH', '--teamcity',    help="TeamCity file path")
-    o(r, str, 'PATH', '--json',        help="JSON file path")
-    o(r, int, 'INT',  '--json-indent', help="JSON indentation (default None)")
+    o(r, str, 'PATH', '--xml',         help='XML file path')
+    o(r, str, 'MODE', '--xml-mode',    help='XML file open mode (default \'a+b\')', default='a+b')
+    o(r, str, 'NAME', '--suite',       help='test suite output name (default %s)' % repr(suite), default=suite)
+    o(r, str, 'PATH', '--teamcity',    help='TeamCity file path')
+    o(r, str, 'PATH', '--json',        help='JSON file path')
+    o(r, int, 'INT',  '--json-indent', help='JSON indentation (default None)')
 
     return p
 
