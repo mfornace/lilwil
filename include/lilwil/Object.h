@@ -94,7 +94,7 @@ Object to_python(T const &v) noexcept {
     if (auto p = v.template target<std::wstring_view>()) return to_python(*p);
     if (auto p = v.template target<char const *>()) return to_python(*p);
     if (auto p = v.template target<Integer>()) return to_python(*p);
-    return to_python(v.convert());
+    return to_python(v.to_string());
     // return std::visit([](auto const &x) {return to_python(x);}, s.var);
 }
 

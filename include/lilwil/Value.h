@@ -4,23 +4,30 @@
 
 namespace lilwil {
 
-using Target = std::string;
-using Conversion = Target(*)(std::any const &);
+using String = std::string;
+using Conversion = String(*)(std::any const &);
 
 /******************************************************************************/
 
 template <class T, class SFINAE=void>
-struct ToTarget {
-    Target operator()(T const &) const {return typeid(T).name();}
+struct ToString {
+    String operator()(T const &) const {return typeid(T).name();}
 };
 
 template <class T, class SFINAE=void>
-struct FromTarget {
-    T operator()(std::any const &a) const {throw std::invalid_argument("no possible conversion");}
+struct Convert {
+    T operator()(std::any const &a) const {
+        std::string s = "no possible conversion from typeid '";
+        s += a.type().name();
+        s += "' to typeid '";
+        s += typeid(T).name();
+        s += "'";
+        throw std::invalid_argument(std::move(s));
+    }
 };
 
 template <class T>
-Target to_target(std::any const &a) {return ToTarget<T>()(std::any_cast<T>(a));};
+String to_string_function(std::any const &a) {return ToString<T>()(std::any_cast<T>(a));};
 
 /******************************************************************************/
 
@@ -28,11 +35,13 @@ class Value {
     std::any val;
     Conversion conv = nullptr;
 public:
-    Target convert() const {return conv(val);}
+    String to_string() const {return conv ? conv(val) : String();}
     std::any const & any() const {return val;}
 
+    Value() = default;
+
     template <class T>
-    Value(T t) : val(std::move(t)), conv(to_target<T>) {}
+    Value(T t) : val(std::move(t)), conv(to_string_function<T>) {}
 
     template <class T>
     T const * target() const {return std::any_cast<T>(&val);}
@@ -40,12 +49,10 @@ public:
     template <class T>
     T convert() const {
         if (auto p = target<T>()) return *p;
-        return FromTarget<T>()(val);
+        return Convert<T>()(val);
     }
 
-    constexpr bool has_value() const {return conv;}
-
-    Value() = default;
+    constexpr bool has_value() const noexcept {return val.has_value();}
 };
 
 /******************************************************************************/
