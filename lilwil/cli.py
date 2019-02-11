@@ -72,7 +72,13 @@ def run_suite(lib, keypairs, masks, gil, cout, cerr, exe=map):
 
     out, err = StringIO(), StringIO()
     f = partial(run_index, lib, masks, out, err, gil, cout, cerr)
-    n, time, *counts = tuple(map(sum, zip(*exe(f, keypairs)))) or (0,) * (len(Event) + 2)
+    try:
+        n, time, *counts = tuple(map(sum, zip(*exe(f, keypairs)))) or (0,) * (len(Event) + 2)
+    except KeyboardInterrupt: # prettify the report of this error type
+        n = None
+
+    if n is None:
+        raise KeyboardInterrupt('Test suite was interrupted while running')
 
     for r, _ in masks:
         r.finalize(n, time, counts, out.getvalue(), err.getvalue())

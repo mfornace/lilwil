@@ -4,12 +4,12 @@ import time, datetime, json
 ################################################################################
 
 class NativeReport(Report):
-    def __init__(self, file, info, indent=None):
+    def __init__(self, file, info, indent=None, keep_null=False):
         self.file = file
         self.indent = indent
+        self.keep_null = bool(keep_null)
         self.contents = {
             'compile-info': dict(name=info[0], date=info[1], time=info[2]),
-            'events': tuple(map(str, Event)),
             'tests': [],
         }
 
@@ -23,7 +23,12 @@ class NativeReport(Report):
 
     def __exit__(self, value, cls, traceback):
         if self.file is not None:
-            json.dump(self.contents, self.file, indent=self.indent)
+            if self.keep_null:
+                contents = self.contents
+            else:
+                contents = self.contents.copy()
+                contents['tests'] = [{k: v for k, v in t.items() if v is not None} for t in contents['tests']]
+            json.dump(contents, self.file, indent=self.indent)
 
 ################################################################################
 
@@ -36,7 +41,7 @@ class NativeTestReport(Report):
         self.contents['events'] = []
 
     def __call__(self, event, scopes, logs):
-        self.contents['events'].append(dict(event=event, scopes=scopes, logs=logs))
+        self.contents['events'].append(dict(event=Event.names[event], scopes=scopes, logs=logs))
 
     def finalize(self, value, time, counts, out, err):
         self.contents.update(dict(value=value, time=time, counts=counts, out=out, err=err))
