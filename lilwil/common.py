@@ -16,7 +16,7 @@ except NameError: # Python 2
 DELIMITER = '/'
 
 # Change this global if you can't use Unicode or you don't like it
-TRANSLATE = {'~~': u'\u2248\u2248'}
+TRANSLATE = {'~': u'\u2248'}
 
 class Event(enum.IntEnum):
     '''Enum mirroring the libwil C++ one'''

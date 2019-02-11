@@ -163,7 +163,7 @@ struct Context {
 
     template <class L, class R, class T, class ...Ts>
     bool within(L const &l, R const &r, T const &tol, Ts &&...ts) {
-        ComparisonGlue<L const &, R const &> expr{l, r, "~~"};
+        ComparisonGlue<L const &, R const &> expr{l, r, "~"};
         if (l == r)
             return require(true, expr, static_cast<Ts &&>(ts)...);
         auto const a = l - r;
@@ -175,7 +175,7 @@ struct Context {
     template <class L, class R, class ...Args>
     bool near(L const &l, R const &r, Args &&...args) {
         bool ok = ApproxEquals<typename ApproxType<L, R>::type>()(unglue(l), unglue(r));
-        return require(ok, ComparisonGlue<L const &, R const &>{l, r, "~~"}, static_cast<Args &&>(args)...);
+        return require(ok, ComparisonGlue<L const &, R const &>{l, r, "~"}, static_cast<Args &&>(args)...);
     }
 
     template <class Exception, class F, class ...Args>

@@ -42,7 +42,8 @@ static PyMethodDef lilwil_methods[] = {
         LILWIL_STRING(LILWIL_MODULE),
         "A Python module to run C++ unit tests",
         -1,
-        lilwil_methods
+        lilwil_methods,
+        nullptr, nullptr, nullptr, nullptr
     };
 
     PyObject* LILWIL_CAT(PyInit_, LILWIL_MODULE)(void) {
