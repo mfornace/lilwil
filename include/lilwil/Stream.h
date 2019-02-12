@@ -2,6 +2,8 @@
 #include <mutex>
 #include <vector>
 #include <ostream>
+#include <streambuf>
+#include <algorithm>
 
 namespace lilwil {
 
