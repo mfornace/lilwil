@@ -30,10 +30,7 @@ class Colorer:
 
     def events(self):
         '''Return list of string of representation for each Event'''
-        out = list(map(Event.name, Event))
-        for i, c in enumerate(self.event_colors):
-            out[i] = self.colored(out[i], c)
-        return out
+        return [self.colored(m, c) for m, c in zip(map(Event.name, Event), self.event_colors)]
 
     def test_name(self, index):
         '''Format a test index message'''
@@ -42,7 +39,7 @@ class Colorer:
 ################################################################################
 
 class ConsoleReport(Report):
-    def __init__(self, file, info, color, timing=False, **kwargs):
+    def __init__(self, file, info, color, timing=False, sync=False):
         self.color = color
         self.events = self.color.events()
         self.file, self.timing = file, timing
@@ -51,11 +48,11 @@ class ConsoleReport(Report):
             self.file.write('Compiler: {}\n'.format(info[0]))
         if info[1] and info[2]:
             self.file.write('Compile time: {}, {}\n'.format(info[2], info[1]))
-        self.kwargs = kwargs
+        self.sync = sync
 
     def __call__(self, index, args, info):
         return ConsoleTestReport(index, args, info, self.file, events=self.events,
-            color=self.color, timing=self.timing, **self.kwargs)
+            color=self.color, timing=self.timing, sync=self.sync)
 
     def finalize(self, n, time, counts, out, err):
         s = self.color.footer + 'Total results for {} test{}:\n'.format(n, '' if n == 1 else 's')

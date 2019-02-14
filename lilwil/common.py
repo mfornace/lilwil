@@ -189,7 +189,7 @@ def multireport(reports):
 
 ################################################################################
 
-def run_test(lib, index, test_masks, args=(), gil=False, cout=False, cerr=False):
+def run_test(lib, index, test_masks, out=None, err=None, args=(), gil=False, cout=False, cerr=False):
     '''
     Call lib.run_test() with curated arguments:
         index: index of test
@@ -205,7 +205,14 @@ def run_test(lib, index, test_masks, args=(), gil=False, cout=False, cerr=False)
             stack.enter_context(r)
             [l.append(r) for m, l in zip(mask, lists) if m]
         reports = tuple(map(multireport, lists))
-        return lib.run_test(index, reports, args, gil, cout, cerr)
+
+        val, time, counts, o, e = lib.run_test(index, reports, args, gil, cout, cerr)
+        out.write(o)
+        err.write(e)
+        for r, _ in test_masks:
+            r.finalize(val, time, counts, o, e)
+        return val, time, counts
+
 
 ################################################################################
 

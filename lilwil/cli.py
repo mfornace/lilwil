@@ -34,8 +34,11 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
     s(t, '--exception',        '-e', help='show exceptions')
     s(t, '--timing',           '-t', help='show timings')
     s(t, '--skip',             '-k', help='show skipped tests')
+
+    t = p.add_argument_group('console options')
     s(t, '--brief',            '-b', help='abbreviate output')
     s(t, '--no-color',         '-n', help='do not use ASCI colors in command line output')
+    s(t, '--no-sync',          '-y', help='show console output asynchronously')
     o(t, str, 'PATH', '--out', '-o', help="output file path (default 'stdout')", default='stdout')
     o(t, str, 'MODE', '--out-mode',  help="output file open mode (default 'w')", default='w')
 
@@ -56,11 +59,7 @@ def run_index(lib, masks, out, err, gil, cout, cerr, p):
     i, args = p
     info = lib.test_info(i)
     test_masks = [(r(i, args, info), m) for r, m in masks]
-    val, time, counts, o, e = run_test(lib, i, test_masks, args=args, gil=gil, cout=cout, cerr=cerr)
-    out.write(o)
-    err.write(e)
-    for r, _ in test_masks:
-        r.finalize(val, time, counts, o, e)
+    val, time, counts = run_test(lib, i, test_masks, out=out, err=err, args=args, gil=gil, cout=cout, cerr=cerr)
     return (1, time) + counts
 
 ################################################################################
@@ -90,7 +89,7 @@ def run_suite(lib, keypairs, masks, gil, cout, cerr, exe=map):
 def main(run=run_suite, lib='libwil', list=False, failure=False, success=False, brief=False,
     exception=False, timing=False, quiet=False, capture=False, gil=False, exclude=False,
     no_color=False, regex=None, out='stdout', out_mode='w', xml=None, xml_mode='a+b', suite='lilwil',
-    teamcity=None, json=None, json_indent=None, jobs=0, tests=None, params=None, skip=False):
+    teamcity=None, json=None, json_indent=None, jobs=0, tests=None, params=None, skip=False, no_sync=None):
     '''Main non-argparse function for running a subset of lilwil tests with given options'''
 
     lib = import_library(lib)
@@ -110,7 +109,7 @@ def main(run=run_suite, lib='libwil', list=False, failure=False, success=False, 
             from . import console
             f = open_file(stack, out, out_mode)
             color = console.Colorer(False if no_color else f.isatty(), brief=brief)
-            r = console.ConsoleReport(f, info, color=color, timing=timing, sync=jobs > 1)
+            r = console.ConsoleReport(f, info, color=color, timing=timing, sync=jobs > 1 and not no_sync)
             masks.append((stack.enter_context(r), mask))
 
         if xml:
