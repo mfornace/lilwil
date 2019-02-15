@@ -27,21 +27,6 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
     s(p, '--gil',                '-g', help='keep Python global interpeter lock on')
     o(p, str, '', 'tests', nargs='*',  help='test names (if not given, specifies all tests)')
 
-    t = p.add_argument_group('output options')
-    s(t, '--quiet',            '-q', help='prevent command line output (at least from Python)')
-    s(t, '--failure',          '-f', help='show failures')
-    s(t, '--success',          '-s', help='show successes')
-    s(t, '--exception',        '-e', help='show exceptions')
-    s(t, '--timing',           '-t', help='show timings')
-    s(t, '--skip',             '-k', help='show skipped tests')
-
-    t = p.add_argument_group('console options')
-    s(t, '--brief',            '-b', help='abbreviate output')
-    s(t, '--no-color',         '-n', help='do not use ASCI colors in command line output')
-    s(t, '--no-sync',          '-y', help='show console output asynchronously')
-    o(t, str, 'PATH', '--out', '-o', help="output file path (default 'stdout')", default='stdout')
-    o(t, str, 'MODE', '--out-mode',  help="output file open mode (default 'w')", default='w')
-
     r = p.add_argument_group('reporter options')
     o(r, str, 'PATH', '--xml',         help='XML file path')
     o(r, str, 'MODE', '--xml-mode',    help='XML file open mode (default \'a+b\')', default='a+b')
@@ -49,6 +34,19 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
     o(r, str, 'PATH', '--teamcity',    help='TeamCity file path')
     o(r, str, 'PATH', '--json',        help='JSON file path')
     o(r, int, 'INT',  '--json-indent', help='JSON indentation (default None)')
+
+    t = p.add_argument_group('console output options')
+    s(t, '--quiet',            '-q', help='prevent command line output (at least from Python)')
+    s(t, '--failure',          '-f', help='show failures')
+    s(t, '--success',          '-s', help='show successes')
+    s(t, '--exception',        '-e', help='show exceptions')
+    s(t, '--timing',           '-t', help='show timings')
+    s(t, '--skip',             '-k', help='show skipped tests')
+    s(t, '--brief',            '-b', help='abbreviate output')
+    s(t, '--no-color',         '-n', help='do not use ASCI colors in command line output')
+    s(t, '--no-sync',          '-y', help='show console output asynchronously')
+    o(t, str, 'PATH', '--out', '-o', help="output file path (default 'stdout')", default='stdout')
+    o(t, str, 'MODE', '--out-mode',  help="output file open mode (default 'w')", default='w')
 
     return p
 
