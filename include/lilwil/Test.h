@@ -176,7 +176,7 @@ Value call(std::string_view s, Context c, ArgPack pack);
 /// Call a registered unit test with non-type-erased arguments and output
 template <class ...Ts>
 Value call(std::string_view s, Context c, Ts &&...ts) {
-    return call(s, std::move(c), Vector{make_output(static_cast<Ts &&>(ts))...});
+    return call(s, std::move(c), Vector<Value>{make_output(static_cast<Ts &&>(ts))...});
 }
 
 /// Get a stored value from its unit test name

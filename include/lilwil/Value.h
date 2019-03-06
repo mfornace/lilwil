@@ -53,7 +53,7 @@ public:
         return Convert<T>()(val);
     }
 
-    constexpr bool has_value() const noexcept {return val.has_value();}
+    bool has_value() const noexcept {return val.has_value();}
 };
 
 /******************************************************************************/
