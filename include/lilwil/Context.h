@@ -104,13 +104,15 @@ struct Context {
     auto timed(std::size_t n, F &&f, Args &&...args) {
         auto const start = Clock::now();
         if constexpr(std::is_same_v<void, std::invoke_result_t<F &&, Args &&...>>) {
-            std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
-            auto const elapsed = Clock::now() - start;
+            for (;n--;) std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
+            auto const elapsed = std::chrono::duration<double>(Clock::now() - start).count();
             handle(Timing, glue("value", elapsed));
             return elapsed;
         } else {
+            for (;--n;) std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
             auto result = std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
-            handle(Timing, glue("value", std::chrono::duration<double>(Clock::now() - start).count()));
+            auto const elapsed = std::chrono::duration<double>(Clock::now() - start).count();
+            handle(Timing, glue("value", elapsed));
             return result;
         }
     }

@@ -10,14 +10,14 @@
 namespace packs {
 
 template <class T>
-using no_qualifier = std::remove_cv_t<std::remove_reference_t<T>>;
+using unqualified = std::remove_cv_t<std::remove_reference_t<T>>;
 
 /******************************************************************************************/
 
 template <class T>
 struct Type  {
     T operator*() const; // undefined
-    constexpr Type<no_qualifier<T>> operator+() const {return {};}
+    constexpr Type<unqualified<T>> operator+() const {return {};}
     operator std::type_index() const {return typeid(T);}
 };
 
@@ -28,7 +28,7 @@ template <class T>
 struct IndexedType {
     std::size_t index;
     T operator*() const; // undefined
-    constexpr Type<no_qualifier<T>> operator+() const {return {};}
+    constexpr Type<unqualified<T>> operator+() const {return {};}
 };
 
 /******************************************************************************************/
@@ -90,7 +90,7 @@ template <class ...Ts> struct Pack {
     template <class F>
     static void for_each(F &&f) {(f(Type<Ts>()), ...);}
 
-    using no_qualifier = Pack<std::remove_cv_t<std::remove_reference_t<Ts>>...>;
+    using unqualified = Pack<std::remove_cv_t<std::remove_reference_t<Ts>>...>;
 };
 
 /******************************************************************************************/
