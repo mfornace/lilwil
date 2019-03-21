@@ -139,6 +139,15 @@ struct Context {
     }
 
     template <class L, class R, class ...Ts>
+    auto all_near(L const &l, R const &r, Ts &&...ts) {
+        auto const &x2 = unglue(l);
+        auto const &y2 = unglue(r);
+        auto const comp = ApproxEquals<typename ApproxType<std::decay_t<decltype(*begin(x2))>,
+                                                           std::decay_t<decltype(*begin(y2))>>::type>();
+        return require(std::equal(begin(x2), end(x2), begin(y2), end(y2), comp), comparison_glue(l, r, "~"), static_cast<Ts &&>(ts)...);
+    }
+
+    template <class L, class R, class ...Ts>
     bool not_equal(L const &l, R const &r, Ts &&...ts) {
         return require(unglue(l) != unglue(r), comparison_glue(l, r, "!="), static_cast<Ts &&>(ts)...);
     }

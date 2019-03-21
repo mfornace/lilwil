@@ -15,7 +15,7 @@ struct Object {
     PyObject *ptr = nullptr;
     Object() = default;
     Object(PyObject *o, bool incref) : ptr(o) {if (incref) Py_INCREF(ptr);}
-    Object(Object const &o) : ptr(o.ptr) {Py_XINCREF(ptr);}
+    Object(Object const &o) noexcept : ptr(o.ptr) {Py_XINCREF(ptr);}
     Object(Object &&o) noexcept : ptr(std::exchange(o.ptr, nullptr)) {}
     explicit operator bool() const {return ptr;}
     PyObject * operator+() const {return ptr;}
