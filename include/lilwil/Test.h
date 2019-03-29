@@ -51,6 +51,8 @@ Pack<Ts...> skip_first_two(Pack<R, C, Ts...>);
 
 /******************************************************************************/
 
+std::string wrong_number_string(std::size_t r, std::size_t e);
+
 /// Basic wrapper to make C++ functor into a type erased std::function
 template <class F>
 struct TestAdapter {
@@ -61,7 +63,7 @@ struct TestAdapter {
     Value operator()(Context &ct, ArgPack args) {
         try {
             if (args.size() != Sig::size)
-                throw std::runtime_error("wrong number of arguments");//Sig::size, args.size());
+                throw std::runtime_error(wrong_number_string(Sig::size, args.size()));
             return Sig::indexed([&](auto ...ts) {
                 return value_invoke(function, ct, cast_index(args, ts)...);
             });

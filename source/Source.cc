@@ -1,8 +1,15 @@
 #include <lilwil/Stream.h>
 #include <lilwil/Suite.h>
 #include <iostream>
+#include <sstream>
 
 namespace lilwil {
+
+std::string wrong_number_string(std::size_t r, std::size_t e) {
+    std::ostringstream s;
+    s << "wrong number of arguments (expected " << r << ", got " << e << ")";
+    return s.str();
+}
 
 /******************************************************************************/
 
