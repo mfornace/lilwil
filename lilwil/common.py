@@ -181,7 +181,7 @@ class MultiReport:
 
 def multireport(reports):
     '''Wrap multiple reports for C++ to look like they are one'''
-    if reports is None:
+    if not reports:
         return None
     if len(reports) == 1:
         return reports[0]

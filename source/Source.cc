@@ -18,7 +18,7 @@ StreamSync cerr_sync{std::cerr, std::cerr.rdbuf()};
 
 /******************************************************************************/
 
-Context::Context(Scopes s, Vector<Handler> h, Vector<Counter> *c, void *m)
+BaseContext::BaseContext(Scopes s, Vector<Handler> h, Vector<Counter> *c, void *m)
     : scopes(std::move(s)), handlers(std::move(h)), counters(c), start_time(Clock::now()), metadata(m) {}
 
 /******************************************************************************/

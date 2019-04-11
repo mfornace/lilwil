@@ -153,11 +153,10 @@ struct PyHandler {
     Object object;
     ReleaseGIL *unlock = nullptr;
 
-    bool operator()(Event event, Scopes const &scopes, LogVec &&logs) {
+    bool operator()(Event event, Scopes const &scopes, LogVec const &logs) {
         if (!+object) return false;
         AcquireGIL lk(unlock); // reacquire the GIL (if it was released)
-
-        Object pyevent = to_python(static_cast<Integer>(event));
+        Object pyevent = to_python(static_cast<Integer>(event.index));
         if (!pyevent) return false;
 
         Object pyscopes = to_python(scopes);
