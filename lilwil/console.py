@@ -1,4 +1,4 @@
-import io, sys, typing
+import io, sys, typing, datetime
 from .common import Report, readable_message, Event
 
 ################################################################################
@@ -47,7 +47,9 @@ class ConsoleReport(Report):
         if info[0]:
             self.file.write('Compiler: {}\n'.format(info[0]))
         if info[1] and info[2]:
-            self.file.write('Compile time: {}, {}\n'.format(info[2], info[1]))
+            self.file.write('Compile time: {}, {}\n'.format(info[1], info[2]))
+        now = datetime.datetime.utcnow()
+        self.file.write('Testing time: {}\n'.format(now.astimezone().strftime('%h %d %Y, %H:%M:%S')))
         self.sync = sync
 
     def __call__(self, index, args, info):

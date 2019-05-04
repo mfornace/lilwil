@@ -1,4 +1,7 @@
 import typing
+from io import StringIO
+from functools import partial
+
 from .common import Event, run_test, open_file, load_parameters, import_library
 from .common import ExitStack, test_indices, parametrized_indices
 
@@ -64,9 +67,6 @@ def run_index(lib, masks, out, err, gil, cout, cerr, p):
 
 def run_suite(lib, keypairs, masks, gil, cout, cerr, exe=map):
     '''Run a subset of tests'''
-    from io import StringIO
-    from functools import partial
-
     out, err = StringIO(), StringIO()
     f = partial(run_index, lib, masks, out, err, gil, cout, cerr)
     try:
