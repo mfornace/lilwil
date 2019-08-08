@@ -11,7 +11,7 @@ set(LILWIL_MIN_PYTHON 2.7 CACHE STRING "Minimum python version to look for (if L
 
 if (${LILWIL_PYTHON_INCLUDE})
     message("-- Using pre-specified Python include ${LILWIL_PYTHON_INCLUDE}")
-elseif (LILWIL_PYTHON)
+elseif (NOT LILWIL_PYTHON STREQUAL LILWIL_PYTHON_OLD)
     execute_process(
         COMMAND ${LILWIL_PYTHON} -c "import sys, sysconfig; sys.stdout.write(sysconfig.get_paths()['include'])"
         RESULT_VARIABLE python_stat OUTPUT_VARIABLE python_include
@@ -19,13 +19,13 @@ elseif (LILWIL_PYTHON)
     if (python_stat)
         message(FATAL_ERROR "Failed to deduce include directory from '${LILWIL_PYTHON}' executable.\nMaybe specify LILWIL_PYTHON_INCLUDE directly.")
     endif()
-    message("-- Using Python include ${python_include} deduced from ${LILWIL_PYTHON}")
+    message("-- Using Python include ${python_include} deduced from LILWIL_PYTHON=${LILWIL_PYTHON}")
     set (LILWIL_PYTHON_INCLUDE ${python_include} CACHE STRING "Python include directory for lilwil")
+    set (LILWIL_PYTHON_OLD ${LILWIL_PYTHON} CACHE INTERNAL "Last value of LILWIL_PYTHON")
 else()
     find_package(PythonLibs ${LILWIL_MIN_PYTHON} REQUIRED)
     set (LILWIL_PYTHON_INCLUDE ${PYTHON_INCLUDE_DIR} CACHE STRING "Python include directory for lilwil")
 endif()
-
 ################################################################################
 
 add_library(lilwil_interface INTERFACE)
