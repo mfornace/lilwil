@@ -116,7 +116,7 @@ def load_parameters(params):
 
 ################################################################################
 
-def test_indices(names, exclude=False, tests=None, regex=''):
+def test_indices(names, exclude=False, tests=None, regex='', strict=False):
     '''
     Return list of indices of tests to run
         exclude: whether to include or exclude the specified tests
@@ -124,10 +124,12 @@ def test_indices(names, exclude=False, tests=None, regex=''):
         regex: pattern to specify tests
     '''
     if tests:
-        try:
-            out = set(names.index(t) for t in tests)
-        except ValueError:
-            raise KeyError('Keys {} are not in the test suite'.format([t for t in tests if t not in names]))
+        out = set()
+        for t in tests:
+            try:
+                out.add(names.index(t) if strict else next(i for i, n in enumerate(names) if t in n))
+            except (StopIteration, ValueError):
+                raise KeyError('Key {} is not in the test suite'.format(repr(t)))
     else:
         out = set() if (regex or exclude) else set(range(len(names)))
 
