@@ -220,13 +220,22 @@ struct Context : BaseContext {
         return require(unglue(l) >= unglue(r), comparison_glue(l, r, ">="), static_cast<Ts &&>(ts)...);
     }
 
-    template <class L, class R, class T, class ...Ts>
-    bool within(L const &l, R const &r, T const &tol, Ts &&...ts) {
+    template <class T, class L, class R, class ...Ts>
+    bool within(T const &tol, L const &l, R const &r, Ts &&...ts) {
         ComparisonGlue<L const &, R const &> expr{l, r, "~"};
-        if (l == r)
-            return require(true, expr, static_cast<Ts &&>(ts)...);
+        if (l == r) return require(true, expr, static_cast<Ts &&>(ts)...);
         auto const a = l - r;
         auto const b = r - l;
+        bool ok = (a < b) ? static_cast<bool>(b < tol) : static_cast<bool>(a < tol);
+        return require(ok, expr, glue("tolerance", tol), glue("difference", b), static_cast<Ts &&>(ts)...);
+    }
+
+    template <class T, class L, class R, class ...Ts>
+    bool log_within(T const &tol, L const &l, R const &r, Ts &&...ts) {
+        ComparisonGlue<L const &, R const &> expr{l, r, "~"};
+        if (l == r) return require(true, expr, static_cast<Ts &&>(ts)...);
+        auto const a = std::log(l / r);
+        auto const b = std::log(r / l);
         bool ok = (a < b) ? static_cast<bool>(b < tol) : static_cast<bool>(a < tol);
         return require(ok, expr, glue("tolerance", tol), glue("difference", b), static_cast<Ts &&>(ts)...);
     }
