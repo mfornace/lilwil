@@ -234,8 +234,8 @@ struct Context : BaseContext {
     bool log_within(T const &tol, L const &l, R const &r, Ts &&...ts) {
         ComparisonGlue<L const &, R const &> expr{l, r, "~"};
         if (l == r) return require(true, expr, static_cast<Ts &&>(ts)...);
-        auto const a = std::log(l / r);
-        auto const b = std::log(r / l);
+        auto const a = (l - r) / r;
+        auto const b = (r - l) / l;
         bool ok = (a < b) ? static_cast<bool>(b < tol) : static_cast<bool>(a < tol);
         return require(ok, expr, glue("tolerance", tol), glue("difference", b), static_cast<Ts &&>(ts)...);
     }
