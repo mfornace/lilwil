@@ -3,15 +3,15 @@ project(lilwil VERSION 0.0.0 LANGUAGES CXX)
 
 ################################################################################
 
-set(LILWIL_PYTHON "python" CACHE STRING "Python executable to use in deducing include directory")
-# set(LILWIL_PYTHON_INCLUDE "" CACHE STRING "Include directory containing Python.h")
-set(LILWIL_MIN_PYTHON 2.7 CACHE STRING "Minimum python version to look for (if LILWIL_PYTHON and LILWIL_PYTHON_INCLUDE not defined)")
+set(LILWIL_PYTHON "python" CACHE STRING "Specified Python executable used to deduce include directory")
+set(LILWIL_PYTHON_INCLUDE "" CACHE STRING "Specified include directory containing Python.h")
 
 ################################################################################
 
 if (${LILWIL_PYTHON_INCLUDE})
-    message("-- Using pre-specified Python include ${LILWIL_PYTHON_INCLUDE}")
-elseif (NOT LILWIL_PYTHON STREQUAL LILWIL_PYTHON_OLD)
+    message("-- Using specified Python include")
+    set_property(GLOBAL PROPERTY lilwil_python_include ${LILWIL_PYTHON_INCLUDE})
+else()
     execute_process(
         COMMAND ${LILWIL_PYTHON} -c "import sys, sysconfig; sys.stdout.write(sysconfig.get_paths()['include'])"
         RESULT_VARIABLE python_stat OUTPUT_VARIABLE python_include
@@ -19,13 +19,12 @@ elseif (NOT LILWIL_PYTHON STREQUAL LILWIL_PYTHON_OLD)
     if (python_stat)
         message(FATAL_ERROR "Failed to deduce include directory from '${LILWIL_PYTHON}' executable.\nMaybe specify LILWIL_PYTHON_INCLUDE directly.")
     endif()
-    message("-- Using Python include ${python_include} deduced from LILWIL_PYTHON=${LILWIL_PYTHON}")
-    set (LILWIL_PYTHON_INCLUDE ${python_include} CACHE STRING "Python include directory for lilwil")
-    set (LILWIL_PYTHON_OLD ${LILWIL_PYTHON} CACHE INTERNAL "Last value of LILWIL_PYTHON")
-else()
-    find_package(PythonLibs ${LILWIL_MIN_PYTHON} REQUIRED)
-    set (LILWIL_PYTHON_INCLUDE ${PYTHON_INCLUDE_DIR} CACHE STRING "Python include directory for lilwil")
+    message("-- Using Python include directory deduced from LILWIL_PYTHON=${LILWIL_PYTHON}")
+    set_property(GLOBAL PROPERTY lilwil_python_include ${python_include})
 endif()
+
+message("-- Using Python include directory ${python_include}")
+
 ################################################################################
 
 add_library(lilwil_interface INTERFACE)
@@ -63,7 +62,9 @@ function(lilwil_module module_name)
 
     target_compile_definitions(${module_name} PRIVATE LILWIL_MODULE=${module_name})
     target_link_libraries(${module_name} PRIVATE lilwil_interface ${ARGN})
-    target_include_directories(${module_name} PRIVATE ${LILWIL_PYTHON_INCLUDE})
+
+    get_property(python_include GLOBAL PROPERTY lilwil_python_include)
+    target_include_directories(${module_name} PRIVATE ${python_include})
 endfunction(lilwil_module)
 
 ################################################################################
