@@ -1,4 +1,4 @@
-import sys, io, enum, typing
+import os, sys, io, enum, typing, importlib
 
 try:
     from contextlib import ExitStack
@@ -73,7 +73,6 @@ def import_library(lib, name=None):
     By default, look for a module with the same name as the file it's in.
     If that fails and :name is given, look for a module of :name instead.
     '''
-    import os, importlib
     sys.path.insert(0, os.path.dirname(os.path.abspath(lib)))
     try:
         return importlib.import_module(lib)
@@ -101,7 +100,9 @@ def open_file(stack, name, mode):
 
 ################################################################################
 
-def load_parameters(params):
+EVAL_MODULES = ['csv', 'json', 'os']
+
+def load_parameters(params, modules=EVAL_MODULES):
     '''load parameters from None, eval-able str, JSON file name, or dict-like'''
     if not params:
         return {}
@@ -112,7 +113,7 @@ def load_parameters(params):
             import json
             return dict(json.load(f))
     except FileError:
-        return eval(params)
+        return eval(params, {k: importlib.import_module(k) for k in modules})
 
 ################################################################################
 
@@ -150,7 +151,9 @@ def parametrized_indices(lib, indices, params=(None,), default=(None,)):
         lib: the lilwil library object
         indices: the possible indices to yield from
         params: dict or list of specified parameters (e.g. from load_parameters())
-    If params is not dict-like, it is assumed to give the default parameters for all tests.
+    If params is not dict-like, it is assumed to either:
+    - give the default parameters for all tests (e.g. [] or [1,2,3]).
+    - give the lists of default parameters for all tests (e.g. [[], [1]]).
     A valid argument list is either:
         a tuple of arguments
         an index to preregistered arguments
@@ -158,6 +161,10 @@ def parametrized_indices(lib, indices, params=(None,), default=(None,)):
     '''
     names = lib.test_names()
     if not hasattr(params, 'get'):
+        try:
+            params[0][0]
+        except (TypeError, IndexError):
+            params = [params]
         params, default = {}, params
     for i in indices:
         ps = list(params.get(names[i], default))

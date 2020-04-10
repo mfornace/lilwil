@@ -28,6 +28,17 @@ PythonError python_error() noexcept {
 
 /******************************************************************************/
 
+/*
+Supported types:
+- None
+- bool
+- int
+- float
+- complex...
+- bytes
+- str
+*/
+
 bool from_python(Value &v, Object o) {
     if (+o == Py_None) {
         v = Value();

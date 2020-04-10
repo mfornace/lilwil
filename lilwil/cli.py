@@ -1,4 +1,4 @@
-import typing
+import typing, sys
 from io import StringIO
 from functools import partial
 
@@ -28,7 +28,7 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
     s(p, '--exclude',            '-x', help='exclude rather than include specified cases')
     s(p, '--capture',            '-c', help='capture std::cerr and std::cout')
     s(p, '--gil',                '-g', help='keep Python global interpeter lock on')
-    o(p, str, '', 'tests', nargs='*',  help='test names (if not given, specifies all tests)')
+    o(p, str, '', 'tests', nargs='*',  help='test names (if not given, specifies all tests that can be run without any user-specified parameters)')
 
     r = p.add_argument_group('reporter options')
     o(r, str, 'PATH', '--xml',         help='XML file path')
@@ -40,12 +40,12 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
 
     t = p.add_argument_group('console output options')
     s(t, '--quiet',            '-q', help='prevent command line output (at least from Python)')
-    s(t, '--failure',          '-f', help='show failures')
-    s(t, '--success',          '-s', help='show successes')
-    s(t, '--exception',        '-e', help='show exceptions')
-    s(t, '--timing',           '-t', help='show timings')
+    s(t, '--failure',          '-f', help='show outputs for failure events')
+    s(t, '--success',          '-s', help='show outputs for success events')
+    s(t, '--exception',        '-e', help='show outputs for exception events')
+    s(t, '--timing',           '-t', help='show outputs for timing events')
     s(t, '--skip',             '-k', help='show skipped tests')
-    s(t, '--brief',            '-b', help='abbreviate output')
+    s(t, '--brief',            '-b', help='abbreviate output (e.g. skip ___ lines)')
     s(t, '--no-color',         '-n', help='do not use ASCI colors in command line output')
     s(t, '--no-sync',          '-y', help='show console output asynchronously')
     o(t, str, 'PATH', '--out', '-o', help="output file path (default 'stdout')", default='stdout')
@@ -135,5 +135,32 @@ def main(run=run_suite, lib='libwil', list=False, failure=False, success=False, 
                    gil=gil, cout=capture, cerr=capture, exe=exe)
 
 
+def exit_main(no_color=False, **kwargs):
+    '''
+    Run the test suite with specified options and exit the program
+    If an exception occurs outside of the test suite, we try to print it in color.
+    (This has a bit of time to import ipython, but it only happens in the case of an error.)
+    '''
+    try:
+        main(no_color=no_color, **kwargs)
+        return
+    except BaseException as e:
+        if no_color:
+            raise
+        x = e
+        info = sys.exc_info()
+
+    try:
+        from IPython.core.ultratb import ColorTB
+    except ImportError:
+        ColorTB = None
+
+    if ColorTB is None:
+        raise x
+
+    sys.stderr.write(ColorTB().text(*info))
+    sys.exit(1)
+
+
 if __name__ == '__main__':
-    main(**vars(parser().parse_args()))
+    exit_main(**vars(parser().parse_args()))

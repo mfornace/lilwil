@@ -76,7 +76,7 @@ UNIT_TEST("test-2", "This is a test 2") = [](lilwil::Context ct) {
 
 UNIT_TEST("test-3") = [](auto ct) {
     std::cout << "ok1" << std::endl;
-    std::cout << lilwil::get_value("max_time").convert<double>() << std::endl;
+    std::cout << lilwil::get_value("max_time").view_as<double>() << std::endl;
     std::cout << "ok2" << std::endl;
     throw std::runtime_error("runtime_error: uh oh");
 };

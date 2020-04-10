@@ -73,3 +73,20 @@ add_library(testlilwil SHARED EXCLUDE_FROM_ALL source/Test.cc)
 set_property(TARGET testlilwil PROPERTY OUTPUT_NAME test)
 target_link_libraries(testlilwil PRIVATE liblilwil)
 lilwil_module(lilwilmodule testlilwil)
+
+################################################################################
+
+# set_property(GLOBAL PROPERTY lilwil_executable_files
+#     ${CMAKE_CURRENT_SOURCE_DIR}/source/Python.cc
+#     ${CMAKE_CURRENT_SOURCE_DIR}/source/Main.cc
+# )
+
+# function(lilwil_executable module_name)
+#     get_property(files GLOBAL PROPERTY lilwil_executable_files)
+#     add_executable(${module_name} ${files})
+#     set_target_properties(${module_name} PROPERTIES PREFIX "")
+#     target_link_libraries(${module_name} PRIVATE lilwil_interface /Users/Mark/mini/envs/inspire/lib/libpython3.6m.dylib ${ARGN})
+
+#     get_property(python_include GLOBAL PROPERTY lilwil_python_include)
+#     target_include_directories(${module_name} PRIVATE ${python_include})
+# endfunction(lilwil_executable)

@@ -43,7 +43,7 @@ Value value_invoke(F const &f, Context &c, Ts &&... ts) {
 template <class T>
 std::decay_t<T> cast_index(ArgPack const &v, packs::IndexedType<T> i) {
     static_assert(std::is_convertible_v<std::decay_t<T>, T>);
-    return v[i.index].template convert<std::decay_t<T>>();
+    return v[i.index].template view_as<std::decay_t<T>>();
 }
 
 template <class R, class C, class ...Ts>
