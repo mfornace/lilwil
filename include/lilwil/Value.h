@@ -1,4 +1,6 @@
 #pragma once
+#include "Config.h"
+
 #include <any>
 #include <string>
 #include <stdexcept>
@@ -6,7 +8,6 @@
 
 namespace lilwil {
 
-using String = std::string;
 using Conversion = String(*)(std::any const &);
 
 /******************************************************************************/
@@ -21,7 +22,7 @@ struct ViewAs;
 
 template <class T>
 String to_string_function(std::any const &a) {
-    if (auto p = std::any_cast<T>(&a)) return ToString<T>()(*p);
+    if (auto p = std::any_cast<T>(&a)) return static_cast<String>(ToString<T>()(*p));
     throw std::logic_error(String("invalid Value: ") + a.type().name() + " != " + typeid(T).name());
 }
 
@@ -76,7 +77,8 @@ struct ViewAs {
 
 /******************************************************************************/
 
-template <class SFINAE> // SFINAE in case user has a different desired behavior
+// Allow integer to bool. SFINAE in case user has a different desired behavior
+template <class SFINAE>
 struct ViewAs<bool, SFINAE> {
     bool operator()(Value const &a) const {
         if (auto p = a.target<Integer>()) return *p;
@@ -84,6 +86,7 @@ struct ViewAs<bool, SFINAE> {
     }
 };
 
+// Allow integer to integer.
 template <class T>
 struct ViewAs<T, std::enable_if_t<std::is_integral_v<T>>> {
     T operator()(Value const &a) const {
@@ -92,15 +95,18 @@ struct ViewAs<T, std::enable_if_t<std::is_integral_v<T>>> {
     }
 };
 
+// Allow integer, double to floating point.
 template <class T>
 struct ViewAs<T, std::enable_if_t<std::is_floating_point_v<T>>> {
     T operator()(Value const &a) const {
+        if (auto p = a.target<Real>()) return *p;
         if (auto p = a.target<Integer>()) return *p;
         throw a.no_conversion(typeid(T));
     }
 };
 
-template <class SFINAE> // SFINAE in case user has a different desired behavior
+// string to string_view. SFINAE in case user has a different desired behavior
+template <class SFINAE>
 struct ViewAs<std::string_view, SFINAE> {
     std::string_view operator()(Value const &a) const {
         if (auto p = a.target<std::string>()) return *p;

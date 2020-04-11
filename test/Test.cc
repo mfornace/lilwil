@@ -5,23 +5,38 @@
 #include <complex>
 #include <shared_mutex>
 
+namespace lilwil {
+
+
+template <class T>
+struct ToString<T, std::void_t<decltype(std::declval<std::ostream &>() << std::declval<T const &>())>> {
+    std::string operator()(T const &t) const {
+        std::ostringstream os;
+        os << t;
+        return os.str();
+    }
+};
+
+
+}
+
 template <class T>
 using SizeOf = std::integral_constant<std::size_t, sizeof(T)>;
 
 // static_assert(SizeOf<std::shared_ptr<void>>() == 16); // 64
 // static_assert(SizeOf<std::mutex>() == 64); // 64
-// static_assert(SizeOf<std::shared_mutex>() == 168); // 168
+// static_assert(SizeOf<std::shared_timed_mutex>() == 168); // 168
 
 struct goo {
     friend std::ostream & operator<<(std::ostream &os, goo) {return os << "goo";}
 };
 
-// namespace lilwil {
-//     template <>
-//     struct Response<goo> {
-//         Value operator()(goo g) const {return {std::in_place_t(), g};}
-//     };
-// }
+namespace lilwil {
+    template <>
+    struct ViewAs<goo> {
+        goo operator()(Value const &v) const {return {};}
+    };
+}
 
 /******************************************************************************/
 
@@ -38,17 +53,11 @@ auto test1 = unit_test("test-1", COMMENT("This is a test"), [](lilwil::Context c
 
     ct.timed(1, []{return 1;});
 
-    // ct.timed(1, [] {
-    //     std::vector<double> x;
-    //     for (int i = 0; i != 1000; ++i) {
-    //         if (std::find(x.begin(), x.end(), i) == x.end()) x.emplace_back(i);
-    //     }
-    // });
-
     ct(HERE).near(5, 5.0);
 
     auto xxx = 5, yyy = 6;
 
+    ct.equal(xxx, yyy, goo(), "ok...");//, goo(), COMMENT("x should equal y"));
     ct.equal(xxx, yyy, goo(), COMMENT("x should equal y"));
 
     if (!ct.equal(1, 2)) return std::vector<goo>(2);
@@ -76,15 +85,24 @@ UNIT_TEST("test-2", "This is a test 2") = [](lilwil::Context ct) {
 
 UNIT_TEST("test-3") = [](auto ct) {
     std::cout << "ok1" << std::endl;
+    // lilwil::add_value("max_time", 2.0);
     std::cout << lilwil::get_value("max_time").view_as<double>() << std::endl;
     std::cout << "ok2" << std::endl;
     throw std::runtime_error("runtime_error: uh oh");
 };
 
+
 UNIT_TEST("test-4") = [](lilwil::Context ct, goo const &) {
     // return goo();
     ct.equal(5, 5);
     throw lilwil::Skip("this test is skipped");
+};
+
+std::shared_timed_mutex mut;
+
+UNIT_TEST("test-6") = [](auto ct) {
+    ct.timed(10, [&]{std::unique_lock<std::shared_timed_mutex> lock(mut);});
+    ct.timed(10, [&]{std::shared_lock<std::shared_timed_mutex> lock(mut);});
 };
 
 void each(double) {}

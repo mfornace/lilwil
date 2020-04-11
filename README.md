@@ -10,7 +10,6 @@ Function is a model of `Vector<Reference> -> Value`.
   - [Requirements](#requirements)
   - [Python](#python)
   - [CMake](#cmake)
-  - [Single header?](#single-header)
 - [Writing tests in C++](#writing-tests-in-c)
   - [Unit test declaration](#unit-test-declaration)
   - [`Context` API](#context-api)
@@ -35,73 +34,67 @@ Function is a model of `Vector<Reference> -> Value`.
   - [Writing your own script](#writing-your-own-script)
   - [An example](#an-example)
 - [`Handler` C++ API](#handler-c-api)
-- [`libcpy` Python API](#libcpy-python-api)
+- [`liblilwil` Python API](#liblilwil-python-api)
   - [Exposed Python functions via C API](#exposed-python-functions-via-c-api)
   - [Exposed Python C++ API](#exposed-python-c-api)
-- [`cpy` Python API](#cpy-python-api)
-- [To do](#to-do)
-  - [Package name](#package-name)
-  - [CMake](#cmake-1)
-  - [Variant](#variant)
+- [`lilwil` Python API](#lilwil-python-api)
   - [Info](#info)
   - [Debugger](#debugger)
 - [Done](#done)
   - [Breaking out of tests early](#breaking-out-of-tests-early)
-  - [Variant](#variant-1)
-  - [CMake](#cmake-2)
+  - [CMake](#cmake-1)
   - [Object size](#object-size)
   - [Library/module name](#librarymodule-name)
   - [FileLine](#fileline)
   - [Exceptions](#exceptions)
   - [Signals](#signals)
   - [Caller, Context](#caller-context)
+- [Notes](#notes)
+- [Global suite implementation / thread safety](#global-suite-implementation--thread-safety)
 
 ## Install
 
 ### Requirements
 - CMake 3.8+
-- C++17 (fold expressions, `constexpr bool *_v` traits, `std::variant`, `std::string_view`, a few `if constexpr`s)
-- CPython 2.7+ or 3.3+
+- C++17 (fold expressions, `constexpr bool *_v` traits, `std::any`, `std::string_view`, a few `if constexpr`s)
+- CPython 2.7+ or 3.3+ (not tested very often on 2.7 though)
 
 ### Python
 Run `pip install .` or `python setup.py install` in the directory where setup.py is. (To do: put on PyPI.)
 
-The module `cpy.cli` is included for command line usage. It can be run directly as a script `python -m cpy.cli ...` or imported from your own script. The `cpy` python package is pure Python, so you can also import it without installing if it's in your `$PYTHONPATH`.
+The module `lilwil.cli` is included for command line usage. It can be run directly as a script `python -m lilwil.cli ...` or imported from your own script. The `lilwil` python package is pure Python, so you can also import it without installing if it's in your `$PYTHONPATH`.
 
 ### CMake
-Write a CMake target for your own shared library(s). Use CMake function `cpy_module(my_shared_target...)` to define a new CMake python module target based on that library.
+Write a CMake target for your own shared library(s). Use CMake function `lilwil_module(my_shared_target...)` to define a new CMake python module target based on that library.
 
-Run CMake with `-DCPY_PYTHON={my python executable}` or `-DCPY_PYTHON_INCLUDE={include folder for python}` to customize. CMake's `find_package(Python)` is not used used by default since only the include directory is needed. You can find your include directory from Python via `sysconfig.get_path('include')` if you need to set it manually for some reason.
-
-### Single header?
-Maybe do this in future, although it's a bit silly.
+Run CMake with `-DLILWIL_PYTHON={my python executable}` to customize. CMake's `find_package(Python)` is not used used by default since only the include directory is needed. You can find your include directory from Python via `sysconfig.get_path('include')` if you need to set it manually for some reason.
 
 ## Writing tests in C++
 
 ### Unit test declaration
 Unit tests are functors which:
-- take a first argument of `cpy::Context` or `cpy::Context &&`
-- take any other arguments of a type convertible from `cpy::Value`
-- return void or an object convertible to `cpy::Value`
+- take a first argument of `lilwil::Context` or `lilwil::Context &&`
+- take any other arguments of a type convertible from `lilwil::Value`
+- return void or an object convertible to `lilwil::Value`
 
-You can use `auto` instead of `cpy::Context` if it is the only parameter. You can't use `auto` for the other parameters unless you specialize the `cpy` signature deduction.
+You can use `auto` instead of `lilwil::Context` if it is the only parameter. You can't use `auto` for the other parameters unless you specialize the `lilwil` signature deduction.
 
 ```c++
 // unit test of the given name
-unit_test("my-test-name", [](cpy::Context ct, ...) {...});
+unit_test("my-test-name", [](lilwil::Context ct, ...) {...});
 // unit test of the given name and comment
-unit_test("my-test-name", "my test comment", [](cpy::Context ct, ...) {...});
+unit_test("my-test-name", "my test comment", [](lilwil::Context ct, ...) {...});
 // unit test of the given name and comment (source location included)
-unit_test("my-test-name", COMMENT("my test comment"), [](cpy::Context ct, ...) {...});
+unit_test("my-test-name", COMMENT("my test comment"), [](lilwil::Context ct, ...) {...});
 // unit test of the given name (source location included)
-UNIT_TEST("my-test-name") = [](cpy::Context ct, ...) {...};
+UNIT_TEST("my-test-name") = [](lilwil::Context ct, ...) {...};
 // unit test of the given name and comment (source location included)
-UNIT_TEST("my-test-name", "my test comment") = [](cpy::Context ct, ...) {...};
+UNIT_TEST("my-test-name", "my test comment") = [](lilwil::Context ct, ...) {...};
 ```
 
 ### `Context` API
 
-Most methods on `Context` are non-const. However, `Context` is fine to be copied or moved around, so it has approximately the same thread safety as `std::vector` and other STL containers. A default-constructed `Context` is valid but not very useful; you shouldn't construct it yourself unless you know what you're doing.
+Most methods on `Context` are non-const. However, `Context` is fine to be copied or moved around, so it has approximately the same thread safety as `std::vector` and other STL containers (i.e. multiple readers are fine, reading and writing at the same time is bad). A default-constructed `Context` is valid but not very useful; you shouldn't construct it yourself unless you know what you're doing.
 
 To run things in parallel within C++, just make multiple copies of your `Context` as needed. However, the registered handlers must be thread safe when called concurrently for this to work. (The included Python handlers are thread safe.)
 
@@ -128,9 +121,22 @@ ct(GLUE(variable) ...);
 bool ok = ct(HERE).require(...);
 ```
 
-It's generally a focus of `cpy` to make macros small and limited. Whereas a use of `CHECK(...)` might capture the file and line number implicitly in `Catch`, in `cpy` to get the same thing you need `ct(HERE).require(...)`. See [Macros](#macros) for the (short) list of available macros from `cpy`.
+It's generally a focus of `lilwil` to make macros small and limited. Whereas a use of `CHECK(...)` might capture the file and line number implicitly in `Catch`, in `lilwil` to get the same thing you need `ct(HERE).require(...)`. See [Macros](#macros) for the (short) list of available macros from `lilwil`.
 
 The intent is generally to yield more transparent C++ code in this regard. However, you're free to define your own macros if you want.
+
+Except for primitive values that are builtins in python, the default print behavior in `lilwil` is just to print the `typeid` name of the given object. You will probably want to customize this behavior yourself. To enable `std::ostream` style print, include the following snippet in the global namespace. `ToString` should return something that can be cast to `std::string`.
+
+```c++
+template <class T>
+struct lilwil::ToString<T, std::void_t<decltype(std::declval<std::ostream &>() << std::declval<T const &>())>> {
+    std::string operator()(T const &t) const {
+        std::ostringstream os;
+        os << t;
+        return os.str();
+    }
+};
+```
 
 #### Test scopes
 
@@ -154,11 +160,11 @@ The functor you pass in is passed as its first argument a new `Context` with a s
 
 ##### Tags
 
-As for `Catch`-style tags, there aren't any in `cpy` outside of this scoping behavior. However, for example, you can run a subset of tests via a regex on the command line (e.g. `-r "test/numeric/.*"`). Or you can write your own Python code to do something more sophisticated.
+As for `Catch`-style tags, there aren't any in `lilwil` outside of this scoping behavior. However, for example, you can run a subset of tests via a regex on the command line (e.g. `-r "test/numeric/.*"`). Or you can write your own Python code to do something more sophisticated.
 
 ##### Suites
 
-`cpy` is really only set up for one suite to be exported from a built module. This suite has static storage (see `Suite.h` for implementation). If you just want subsets of tests, use the above scope functionality.
+`lilwil` is really only set up for one suite to be exported from a built module. This suite has static storage (see `Suite.h` for implementation). If you just want subsets of tests, use the above scope functionality.
 
 #### Assertions
 
@@ -188,8 +194,10 @@ See also [Approximate comparison](#approximate-comparison) below.
 ```c++
 // skip out of the test with a throw
 throw lilwil::Skip("optional message");
-// skip out of the test without throwing.
-ct.handle(Skipped, "optional message"); return;
+
+// or, skip out of the test without throwing.
+ct.handle(Skipped, "optional message");
+return;
 ```
 
 #### Timings
@@ -209,7 +217,7 @@ If the user specifies a tolerance manually, `Context::within` checks that either
 bool ok = ct.within(tolerance, l, r, args...);
 ```
 
-Otherwise, `Context::near()` checks that two arguments are approximately equal by using a specialization of `cpy::Approx` for the types given.
+Otherwise, `Context::near()` checks that two arguments are approximately equal by using a specialization of `lilwil::Approx` for the types given.
 
 ```c++
 bool ok = ct.near(l, r, args...);
@@ -219,7 +227,7 @@ For floating point types, `Approx` defaults to checking `|l - r| < eps * (scale 
 
 ### Macros
 
-The following macros are defined with `CPY_` prefix if `Macros.h` is included. If not already defined, prefix-less macros are also defined there.
+The following macros are defined with `LILWIL_` prefix if `Macros.h` is included. If not already defined, prefix-less macros are also defined there.
 ```c++
 #define GLUE(x) KeyPair(#x, x) // string of the expression and the expression value
 #define HERE file_line(__FILE__, __LINE__) // make a FileLine datum with the current file and line
@@ -244,7 +252,7 @@ This means that calling `ct.info(expr)` will default to making a message with an
 
 In general, the key in a `KeyPair` is expected to be one of a limited set of strings that is recognizable by the registered handlers (hence why the key is of type `std::string_view`). Make sure any custom keys have static storage duration.
 
-A common specialization used in `cpy` is for a key value pair of any types called a `Glue`:
+A common specialization used in `lilwil` is for a key value pair of any types called a `Glue`:
 ```c++
 template <class K, class V>
 struct Glue {
@@ -279,7 +287,7 @@ If a C++ exception occurs while running this type of test, the runner generally 
 
 This type of test may be called from anywhere in type-erased fashion:
 ```c++
-Value output = call("my-test-name", (Context) ct, args...); // void() translated to std::monostate
+Value output = call("my-test-name", (Context) ct, args...);
 ```
 
 The output from the function must be convertible to `Value` in this case.
@@ -301,8 +309,8 @@ lib.add_value('number-of-threads', 4)
 
 and retrieve it while running tests in C++:
 ```c++
-Integer n = get_value("number-of-threads").as_integer(); // preferred, n = 4
-Integer n = call("number-of-threads", (Context) ct).as_integer(); // equivalent
+int n = get_value("number-of-threads").view_as<int>(); // preferred, n = 4
+int n = call("number-of-threads", my_context).view_as<int>(); // equivalent
 ```
 
 #### Python function
@@ -310,19 +318,19 @@ Integer n = call("number-of-threads", (Context) ct).as_integer(); // equivalent
 Or sometimes, you might want to make a type-erased handler to Python.
 
 ```python
-lib.add_test('number-of-threads', lambda i: i * 2)
+lib.add_test('times-two', lambda i: i * 2)
 ```
 
 and retrieve it while running tests in C++:
 ```c++
-auto n = call("number-of-threads", 5).as_integer(); // n = 10
+int n = call("times-two", 5).view_as<int>(); // n = 10
 ```
 
 ### Templated functions
 
 You can test different types via the following within a test case
 ```c++
-cpy::Pack<int, Real, bool>::for_each([&ct](auto t) {
+lilwil::Pack<int, Real, bool>::for_each([&ct](auto t) {
     using type = decltype(*t);
     // do something with type and ct
 });
@@ -332,25 +340,25 @@ For more advanced functionality try something like `boost::hana`.
 ## Running tests from the command line
 
 ```bash
-python -m cpy.cli -a mylib # run all tests from mylib.so/mylib.dll/mylib.dylib
+python -m lilwil.cli -a mylib # run all tests from mylib.so/mylib.dll/mylib.dylib
 ```
 
 By default, events are only counted and not logged. To see more output use:
 
 ```bash
-python -m cpy.cli -a mylib -fe # log information on failures, exceptions, skips
-python -m cpy.cli -a mylib -fsetk # log information on failures, successes, exceptions, timings, skips
+python -m lilwil.cli -a mylib -fe # log information on failures, exceptions, skips
+python -m lilwil.cli -a mylib -fsetk # log information on failures, successes, exceptions, timings, skips
 ```
 
 There are a few other reporters written in the Python package, including writing to JUnit XML, a simple JSON format, and streaming TeamCity directives.
 
 In general, command line options which expect an output file path ca take `stderr` and `stdout` as special values which signify that the respective streams should be used.
 
-See the command line help `python -m cpy.cli --help` for other options.
+See the command line help `python -m lilwil.cli --help` for other options.
 
 ### Python threads
 
-`cpy.cli` exposes a command line option for you to specify the number of threads used. The threads are used simply via something like:
+`lilwil.cli` exposes a command line option for you to specify the number of threads used. The threads are used simply via something like:
 
 ```python
 from multiprocessing.pool import ThreadPool
@@ -359,7 +367,7 @@ ThreadPool(n_threads).imap(tests, run_test)
 
 If the number of threads (`--jobs`) is set to 0, no threads are spawned, and everything is run in the main thread. This is a little more lightweight, but signals such as `CTRL-C` (`SIGINT`) will not be caught immediately during execution of a test. This parameter therefore has a default of 1.
 
-Also, `cpy` turns off the Python GIL by default when running tests, but if you need to, you can keep it on (with `--gil`). The GIL is re-acquired by the Python handlers as necessary.
+Also, `lilwil` turns off the Python GIL by default when running tests, but if you need to, you can keep it on (with `--gil`). The GIL is re-acquired by the Python handlers as necessary.
 
 ### Writing your own script
 
@@ -367,9 +375,9 @@ It is easy to write your own executable Python script to wrap the one provided. 
 
 ```python
 #!/usr/bin/env python3
-from cpy import cli
+from lilwil import cli
 
-parser = cli.parser(lib='my_lib_name') # redefine the default library name away from 'libcpy'
+parser = cli.parser(lib='my_lib_name') # redefine the default library name away from 'liblilwil'
 parser.add_argument('--time', type=float, default=60, help='max test time in seconds')
 
 kwargs = vars(parser.parse_args())
@@ -387,7 +395,7 @@ Let's use the `Value` registered above to write a helper to repeat a test until 
 ```c++
 template <class F>
 void repeat_test(Context const &ct, F const &test) {
-    auto max = ct.start_time + std::chrono::duration<Real>(get_value("max_time").as_real());
+    double max = ct.start_time + std::chrono::duration<Real>(get_value("max_time").view_as<double>());
     while (Clock::now() < max) test();
 }
 ```
@@ -397,7 +405,7 @@ UNIT_TEST("my-test") = [](Context ct) {
     repeat_test(ct, [&] {run_some_random_test(ct);});
 };
 ```
-You could define further extensions could run the test iterations in parallel. Functionality like `repeat_test` is intentionally left out of the `cpy` API so that users can define their own behavior.
+You could define further extensions could run the test iterations in parallel. Functionality like `repeat_test` is intentionally left out of the API so that users can define their own behavior.
 
 ## `Handler` C++ API
 Events are kept track of via a simple integer `enum`. It is relatively easy to extend to more event types.
@@ -411,15 +419,15 @@ using Handler = std::function<bool(Event, Scopes const &, Logs &&)>;
 
 Obviously, try not to rely explicitly on the actual `enum` values of `Event` too much.
 
-Since it's so commonly used, `cpy` tracks the number of times each `Event` is signaled by a test, whether a handler is registered or not. `Context` has a non-owning reference to a vector of `std::atomic<std::size_t>` to keep these counts in a threadsafe manner. You can query the count for a given `Event`:
+Since it's so commonly used, `lilwil` tracks the number of times each `Event` is signaled by a test, whether a handler is registered or not. `Context` has a non-owning reference to a vector of `std::atomic<std::size_t>` to keep these counts in a threadsafe manner. You can query the count for a given `Event`:
 
 ```c++
 std::ptrdiff_t n_fail = ct.count(Failure); // const, noexcept; gives -1 if the event type is out of range
 ```
 
-## `libcpy` Python API
+## `liblilwil` Python API
 
-`libcpy` refers to the Python extension module being compiled. The `libcpy` Python handlers all use the official CPython API. Doing so is really not too hard beyond managing `PyObject *` lifetimes.
+`liblilwil` refers to the Python extension module being compiled. The `liblilwil` Python handlers all use the official CPython API. Doing so is really not too hard beyond managing `PyObject *` lifetimes.
 
 ### Exposed Python functions via C API
 
@@ -472,21 +480,9 @@ struct PyTestCase : Object;
 
 Look in the code for more detail.
 
-## `cpy` Python API
+## `lilwil` Python API
 
 Write this.
-
-## To do
-
-### Package name
-`cpy` is short but not great otherwise. Maybe `cpt` or `cptest`.
-
-### CMake
-Fix up caching of python include directory.
-
-### Variant
-- Should rethink if `variant<..., any>` is better than just `any`.
-- time or timedelta? function? ... no
 
 ### Info
 Finalize `info` API. Just made it return self. Accept variadic arguments? Initializer list?
@@ -519,24 +515,18 @@ It is fully possible to truncate the test once `start_time` is inside, or any ot
 Possibly `start_time` should be given to handler, or `start_time` and `current_time`.
 Standardize what handler return value means, add skip event if needed.
 
-### Variant
-- `complex<Real>` is probably not that useful, but it's included (in Python so whatever)
-- `std::string` is the biggest object on my architecture (24 bytes). `std::any` is 32.
-- Just use `std::ptrdiff_t` instead of `std::size_t`? Probably.
-
 
 ### CMake
 User needs to give shared library target for now so that exports all occur
 
 ### Object size
-- Can explicitly instantiate Context copy constructors etc.
+- Can explicitly instantiate `Context` copy constructors etc.
 - Write own version of `std::function` (maybe)
-- Already hid the `std::variant` (has some impact on readability but decreased object size a lot)
 
 ### Library/module name
-One option is leave as is. The library is built in whatever file, always named libcpy.
+One option is leave as is. The library is built in whatever file, always named liblilwil.
 This is only usable if Python > 3.4 and specify -a file_name.
-And, I think there can't be multiple modules then, because all named libcpy right? Yes.
+And, I think there can't be multiple modules then, because all named liblilwil right? Yes.
 So, I agree -a file_name is fine. Need to change `PyInit_NAME`.
 So when user builds, they have to make a small module file of their desired name.
 We can either do this with macros or with CMake. I guess macros more generic.
@@ -582,3 +572,37 @@ The test that's handled should therefore be Context.
 I guess the current strategy is fine.
 
 Also caller? copyable?
+
+
+## Notes
+
+We use a slightly adhoc implementation of Value. Any printable, copyable object may be used as a Value. Under the hood, a `std::any` and a type-erased function pointer for printing is used. However, the only guaranteed types that can passed in from the CLI as arguments are builtins:
+- `std::string`
+- `bool`
+- `Integer` (typedef of `std::ptrdiff_t`)
+- `Real` (typedef of `double`)
+
+In addition, null values can be created and passed in. There might be some complaint that structured types are not available. The response would be that in a unit testing scenario, it would probably make more sense to pass in a structured data object via something like a JSON string anyway. In the future though it may be worth thinking about some better support for structured types however, like numerical arrays or key-value maps.
+
+
+## Global suite implementation / thread safety
+
+Some custom behavior is allowed for the global test suite. What needs to be met is the read_suite / write_suite interface below, which call functors in a thread-safe manner on a STL container like deque. Define `LILWIL_CUSTOM_SUITE` to your own header to define your own behavior completely. Otherwise, define `LILWIL_NO_MUTEX` to avoid locking around the test suite, which is in general fine except when modifying global tests or values from *within* a test. `LILWIL_NO_MUTEX` will be assumed if `<shared_mutex>` is unavailable, but a warning will be issued in this case.
+
+The non-threadsafe interface is as follows:
+
+```c++
+std::deque<TestCase> & suite() {
+    static std::deque<TestCase> static_suite;
+    return static_suite;
+}
+
+template <class F>
+auto write_suite(F &&functor) {return functor(suite());}
+
+template <class F>
+auto read_suite(F &&functor) {return functor(static_cast<Suite const &>(suite()));}
+```
+
+The threadsafe interface (the default) is like the above, but using a `shared_lock`/`unique_lock` on a `std::shared_timed_mutex`.
+

@@ -49,6 +49,8 @@ set_property(GLOBAL PROPERTY lilwil_module_files
     ${CMAKE_CURRENT_SOURCE_DIR}/source/Module.cc
 )
 
+set_property(GLOBAL PROPERTY lilwil_directory ${CMAKE_CURRENT_SOURCE_DIR})
+
 function(lilwil_module module_name)
     get_property(files GLOBAL PROPERTY lilwil_module_files)
     add_library(${module_name} MODULE ${files})
@@ -65,28 +67,18 @@ function(lilwil_module module_name)
 
     get_property(python_include GLOBAL PROPERTY lilwil_python_include)
     target_include_directories(${module_name} PRIVATE ${python_include})
+
+    get_property(lilwil_dir GLOBAL PROPERTY lilwil_directory)
+    set(LILWIL_DEFAULT_IMPORT_PATH ${lilwil_dir})
+    # following not quite right in all cases...
+    set(LILWIL_DEFAULT_LIBRARY_NAME ${module_name})
+    configure_file(${lilwil_dir}/source/test ${CMAKE_CURRENT_BINARY_DIR}/${module_name})
 endfunction(lilwil_module)
 
 ################################################################################
 
-add_library(testlilwil SHARED EXCLUDE_FROM_ALL source/Test.cc)
-set_property(TARGET testlilwil PROPERTY OUTPUT_NAME test)
-target_link_libraries(testlilwil PRIVATE liblilwil)
-lilwil_module(lilwilmodule testlilwil)
+set(LILWIL_TEST OFF CACHE BOOL "Build unit tests of lilwil")
+if(LILWIL_TEST)
+    add_subdirectory(test)
+endif()
 
-################################################################################
-
-# set_property(GLOBAL PROPERTY lilwil_executable_files
-#     ${CMAKE_CURRENT_SOURCE_DIR}/source/Python.cc
-#     ${CMAKE_CURRENT_SOURCE_DIR}/source/Main.cc
-# )
-
-# function(lilwil_executable module_name)
-#     get_property(files GLOBAL PROPERTY lilwil_executable_files)
-#     add_executable(${module_name} ${files})
-#     set_target_properties(${module_name} PROPERTIES PREFIX "")
-#     target_link_libraries(${module_name} PRIVATE lilwil_interface /Users/Mark/mini/envs/inspire/lib/libpython3.6m.dylib ${ARGN})
-
-#     get_property(python_include GLOBAL PROPERTY lilwil_python_include)
-#     target_include_directories(${module_name} PRIVATE ${python_include})
-# endfunction(lilwil_executable)

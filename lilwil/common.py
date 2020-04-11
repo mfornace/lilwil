@@ -39,6 +39,7 @@ Event.names = ('Failure', 'Success', 'Exception', 'Timing', 'Skipped')
 ################################################################################
 
 def foreach(function, *args):
+    '''Run function on each positional argument in sequence'''
     return tuple(map(function, args))
 
 ################################################################################
@@ -100,10 +101,34 @@ def open_file(stack, name, mode):
 
 ################################################################################
 
-EVAL_MODULES = ['csv', 'json', 'os']
+# Modify this global list as needed
+EVAL_MODULES = ['csv', 'json', 'os', 'numpy', 'pandas']
 
-def load_parameters(params, modules=EVAL_MODULES):
-    '''load parameters from None, eval-able str, JSON file name, or dict-like'''
+def nice_eval(string, modules=None):
+    '''
+    Run eval() on a user's specified string
+    For convenience, give them access to the whitelisted modules
+    '''
+
+    mods = {}
+    for m in EVAL_MODULES if modules is None else modules:
+        if m not in string:
+            continue
+        try:
+            mods[m] = importlib.import_module(m)
+        except ImportError:
+            pass
+
+    return eval(string, mods)
+
+
+def load_parameters(params):
+    ''' load parameters from one of:
+    - None
+    - dict-like
+    - JSON file name
+    - eval-able str
+    '''
     if not params:
         return {}
     elif not isinstance(params, str):
@@ -113,7 +138,7 @@ def load_parameters(params, modules=EVAL_MODULES):
             import json
             return dict(json.load(f))
     except FileError:
-        return eval(params, {k: importlib.import_module(k) for k in modules})
+        return nice_eval(params)
 
 ################################################################################
 
@@ -148,16 +173,16 @@ def test_indices(names, exclude=False, tests=None, regex='', strict=False):
 def parametrized_indices(lib, indices, params=(None,), default=(None,)):
     '''
     Yield tuple of (index, parameter_pack) for each test to run
-        lib: the lilwil library object
-        indices: the possible indices to yield from
-        params: dict or list of specified parameters (e.g. from load_parameters())
+    - lib: the lilwil library object
+    - indices: the possible indices to yield from
+    - params: dict or list of specified parameters (e.g. from load_parameters())
     If params is not dict-like, it is assumed to either:
     - give the default parameters for all tests (e.g. [] or [1,2,3]).
     - give the lists of default parameters for all tests (e.g. [[], [1]]).
     A valid argument list is either:
-        a tuple of arguments
-        an index to preregistered arguments
-        None, meaning all preregistered arguments
+    - a tuple of arguments
+    - an index to preregistered arguments
+    - None, meaning all preregistered arguments
     '''
     names = lib.test_names()
     if not hasattr(params, 'get'):
@@ -241,7 +266,7 @@ def readable_logs(keys, values, indent):
     '''Return readable string of key value pairs'''
     s = io.StringIO()
     while 'comment' in keys: # comments
-        foreach(s.write, indent, 'comment: ', repr(pop_value('__comment', keys, values)), '\n')
+        foreach(s.write, indent, 'comment: ', repr(pop_value('comment', keys, values)), '\n')
 
     comp = ('__lhs', '__op', '__rhs') # comparisons
     while all(map(keys.__contains__, comp)):

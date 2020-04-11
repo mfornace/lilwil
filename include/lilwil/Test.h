@@ -86,7 +86,7 @@ struct TestAdapter {
 
 /******************************************************************************/
 
-/// Basic wrapper to make a fixed Variable into a std::function
+/// Basic wrapper to make a fixed Value into a std::function
 struct ValueAdapter {
     Value value;
     Value operator()(Context &, ArgPack const &) const {return value;}
@@ -172,7 +172,7 @@ struct AnonymousClosure {
 /******************************************************************************/
 
 /// Call a registered unit test with type-erased arguments and output
-/// Throw std::runtime_error if test not found or test throws exception
+/// Throw std::out_of_range if test not found or test throws exception
 Value call(std::string_view s, Context c, ArgPack pack);
 
 /// Call a registered unit test with non-type-erased arguments and output
@@ -182,8 +182,19 @@ Value call(std::string_view s, Context c, Ts &&...ts) {
 }
 
 /// Get a stored value from its unit test name
-/// Throw std::runtime_error if test not found or test does not hold a Value
-Value get_value(std::string_view s);
+/// If test not found or test does not hold a Value:
+/// - allow_missing == false: throws std::out_of_range
+/// - allow_missing == true: returns an empty Value
+Value get_value(std::string_view key, bool allow_missing=false);
+
+// Setters are not exposed because this would be potentially unthreadsafe
+// It's possible we could put locks around the global suite in the future to allow this
+
+/// Set a value, removing any prior test cases that had the same key
+// Value & set_value(std::string_view key, Value v);
+
+/// Add a value to the test suite
+// Value & add_value(std::string_view key, Value v);
 
 /******************************************************************************/
 

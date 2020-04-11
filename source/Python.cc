@@ -1,8 +1,9 @@
-#include <lilwil/Suite.h>
+#include <lilwil/Impl.h>
 #include <lilwil/Stream.h>
 #include <lilwil/Object.h>
 #include <chrono>
 #include <iostream>
+#include <optional>
 #include <vector>
 
 namespace lilwil {
@@ -28,49 +29,95 @@ PythonError python_error() noexcept {
 
 /******************************************************************************/
 
-/*
-Supported types:
-- None
-- bool
-- int
-- float
-- complex...
-- bytes
-- str
-*/
+std::optional<String> string_from_unicode(PyObject *o) {
+    Py_ssize_t size;
+#if PY_MAJOR_VERSION > 2
+    char const *c = PyUnicode_AsUTF8AndSize(o, &size);
+#else
+    char *c;
+    if (PyString_AsStringAndSize(o, &c, &size)) return false;
+#endif
+    std::optional<String> out;
+    if (c) out.emplace(static_cast<char const *>(c), size);
+    return out;
+}
+
+/******************************************************************************/
+
+std::optional<ArrayView> from_memoryview(PyObject *o) {
+    auto buff = PyMemoryView_GET_BUFFER(o);
+    std::vector<std::size_t> shape(buff->shape, buff->shape + buff->ndim);
+
+    std::type_info const *t = nullptr;
+    auto const f = std::string_view(buff->format);
+
+         if (f == "d") t = &typeid(double);
+    else if (f == "f") t = &typeid(float);
+    else if (f == "c") t = &typeid(char);
+    else if (f == "b") t = &typeid(signed char);
+    else if (f == "B") t = &typeid(unsigned char);
+    else if (f == "?") t = &typeid(bool);
+    else if (f == "h") t = &typeid(short);
+    else if (f == "H") t = &typeid(unsigned short);
+    else if (f == "i") t = &typeid(int);
+    else if (f == "I") t = &typeid(unsigned int);
+    else if (f == "l") t = &typeid(long);
+    else if (f == "L") t = &typeid(unsigned long);
+    else if (f == "q") t = &typeid(long long);
+    else if (f == "Q") t = &typeid(unsigned long long);
+    else if (f == "n") t = &typeid(ssize_t);
+    else if (f == "s") t = &typeid(char[]);
+    else if (f == "p") t = &typeid(char[]);
+    else if (f == "N") t = &typeid(size_t);
+    else if (f == "P") t = &typeid(void);
+
+    std::optional<ArrayView> out;
+    if (t) {
+        out.emplace(buff->buf, *t, std::move(shape));
+    } else {
+        PyErr_SetString(PyExc_NotImplementedError, "memoryview cannot be converted to C++");
+    }
+    return out;
+}
 
 bool from_python(Value &v, Object o) {
-    if (+o == Py_None) {
+    if (+o == Py_None) { // None
         v = Value();
-    } else if (PyBool_Check(+o)) {
+    } else if (PyBool_Check(+o)) { // bool
         v = (+o == Py_True) ? true : false;
-    } else if (PyLong_Check(+o)) {
+    } else if (PyLong_Check(+o)) { // int
         v = static_cast<Integer>(PyLong_AsLongLong(+o));
-    } else if (PyFloat_Check(+o)) {
+    } else if (PyFloat_Check(+o)) { // float
         v = static_cast<Real>(PyFloat_AsDouble(+o));
-    } else if (PyComplex_Check(+o)) {
+    } else if (PyComplex_Check(+o)) { // complex...pretty niche but sure.
         v = std::complex<double>{PyComplex_RealAsDouble(+o), PyComplex_ImagAsDouble(+o)};
-    } else if (PyBytes_Check(+o)) {
+    } else if (PyBytes_Check(+o)) { // binary
         char *c;
         Py_ssize_t size;
         PyBytes_AsStringAndSize(+o, &c, &size);
-        v = std::string(c, size);
+        v = Binary(reinterpret_cast<unsigned char const *>(c), size);
     } else if (PyUnicode_Check(+o)) { // no use of wstring for now.
-        Py_ssize_t size;
-#if PY_MAJOR_VERSION > 2
-        char const *c = PyUnicode_AsUTF8AndSize(+o, &size);
-#else
-        char *c;
-        if (PyString_AsStringAndSize(+o, &c, &size)) return false;
-#endif
-        if (c) v = std::string(static_cast<char const *>(c), size);
+        if (auto s = string_from_unicode(+o)) v = std::move(*s);
         else return false;
-    // } else if (PyObject_CheckBuffer(+o)) {
-// hmm
-    // } else if (PyMemoryView_Check(+o)) {
-// hmm
-    } else {
-        PyErr_SetString(PyExc_TypeError, "Invalid type for conversion to C++");
+    } else if (PyCallable_Check(+o)) { // function-like
+        PyErr_SetString(PyExc_NotImplementedError, "Callables cannot be converted to C++ (yet)");
+    } else if (PyMemoryView_Check(+o)) { // memoryview
+        if (auto a = from_memoryview(+o)) v = std::move(*a);
+        else return false;
+    } else if (PyObject_CheckBuffer(+o)) { // Buffer exposing type
+        if (Object mv = {PyMemoryView_GetContiguous(+o, PyBUF_READ, 'C'), false}) {
+            return from_python(v, std::move(mv));
+        }
+    } else { // tuples, dicts, lists
+        if (Object json = {PyImport_ImportModule("json"), false}) {
+            if (Object dumps = {PyObject_GetAttrString(+json, "dumps"), false}) {
+                if (Object string = {PyObject_CallFunctionObjArgs(+dumps, +o, NULL), false}) {
+                    if (auto s = string_from_unicode(+string)) {
+                        v = JSON{std::move(*s)};
+                    }
+                }
+            }
+        }
     }
     return !PyErr_Occurred();
 };
@@ -116,13 +163,19 @@ Value run_test(double &time, TestCase const &test, bool no_gil,
 
 /******************************************************************************/
 
-TestCase *get_test(Py_ssize_t i) {
-    if (i >= lilwil::suite().size()) {
-        PyErr_SetString(PyExc_IndexError, "Unit test index out of range");
-        return nullptr;
-    }
-    return &lilwil::suite()[i];
+std::optional<TestCase> get_test(Py_ssize_t i) {
+    std::optional<TestCase> out;
+    read_suite([&](auto const &cases) {
+        if (i < cases.size()) {
+            out.emplace(cases[i]);
+        } else {
+            PyErr_SetString(PyExc_IndexError, "Unit test index out of range");
+        }
+    });
+    return out;
 }
+
+/******************************************************************************/
 
 Object run_test(Py_ssize_t i, Object calls, Object pypack, bool cout, bool cerr, bool no_gil) {
     auto const test = lilwil::get_test(i);
@@ -203,6 +256,7 @@ extern "C" {
 
 /******************************************************************************/
 
+// (int, object, object, object, object, object) -> object
 PyObject *lilwil_run_test(PyObject *self, PyObject *args) {
     Py_ssize_t i;
     PyObject *calls, *pack, *cout, *cerr, *gil;
@@ -217,18 +271,22 @@ PyObject *lilwil_run_test(PyObject *self, PyObject *args) {
 
 /******************************************************************************/
 
+// () -> int
 PyObject *lilwil_n_tests(PyObject *, PyObject *) {
-    return Py_BuildValue("n", static_cast<Py_ssize_t>(lilwil::suite().size()));
+    auto size = lilwil::read_suite([](auto const &cases) {return cases.size();});
+    return Py_BuildValue("n", static_cast<Py_ssize_t>(size));
 }
 
+// () -> None
 PyObject *lilwil_finalize(PyObject *, PyObject *) {
-    lilwil::suite().clear();
+    lilwil::write_suite([](auto &cases) {cases.clear();});
     Py_INCREF(Py_None);
     return Py_None;
 }
 
 /******************************************************************************/
 
+// (str, object, object) -> None
 PyObject *lilwil_add_test(PyObject *, PyObject *args) {
     char const *s;
     PyObject *fun, *pypacks = nullptr;
@@ -248,6 +306,7 @@ PyObject *lilwil_add_test(PyObject *, PyObject *args) {
     });
 }
 
+// (str, object) -> None
 PyObject *lilwil_add_value(PyObject *, PyObject *args) {
     char const *s;
     PyObject *obj;
@@ -263,6 +322,7 @@ PyObject *lilwil_add_value(PyObject *, PyObject *args) {
 
 /******************************************************************************/
 
+// () -> (str, str, str)
 PyObject *lilwil_compile_info(PyObject *, PyObject *) {
     auto v = lilwil::to_python(__VERSION__ "");
     auto d = lilwil::to_python(__DATE__ "");
@@ -272,31 +332,37 @@ PyObject *lilwil_compile_info(PyObject *, PyObject *) {
 
 /******************************************************************************/
 
+// () -> (str, ...)
 PyObject *lilwil_test_names(PyObject *, PyObject *) {
     return lilwil::return_object([] {
-        return lilwil::to_tuple(lilwil::suite(),
-            [](auto const &c) -> decltype(c.name) {return c.name;}
-        );
+        return lilwil::read_suite([](auto const &cases) {
+            return lilwil::to_tuple(cases,
+                [](auto const &c) -> decltype(c.name) {return c.name;}
+            );
+        });
     });
 }
 
 /******************************************************************************/
 
+// (str) -> int
 PyObject *lilwil_find_test(PyObject *self, PyObject *args) {
     char const *s;
     if (!PyArg_ParseTuple(args, "s", &s)) return nullptr;
     return lilwil::return_object([s] {
         std::string_view name{s};
-        auto const &cases = lilwil::suite();
-        for (std::size_t i = 0; i != cases.size(); ++i)
-            if (cases[i].name == name) return lilwil::to_python(i);
-        PyErr_SetString(PyExc_KeyError, "Test name not found");
-        return lilwil::Object();
+        return lilwil::read_suite([name](auto const &cases) {
+            for (std::size_t i = 0; i != cases.size(); ++i)
+                if (cases[i].name == name) return lilwil::to_python(i);
+            PyErr_SetString(PyExc_KeyError, "Test name not found");
+            return lilwil::Object();
+        });
     });
 }
 
 /******************************************************************************/
 
+// (int) -> int
 PyObject *lilwil_n_parameters(PyObject *, PyObject *args) {
     Py_ssize_t i;
     if (!PyArg_ParseTuple(args, "n", &i)) return nullptr;
@@ -307,6 +373,7 @@ PyObject *lilwil_n_parameters(PyObject *, PyObject *args) {
 
 /******************************************************************************/
 
+// (int) -> (str, str, int, str)
 PyObject *lilwil_test_info(PyObject *self, PyObject *args) {
     Py_ssize_t i;
     if (!PyArg_ParseTuple(args, "n", &i)) return nullptr;

@@ -1,11 +1,11 @@
 #include <lilwil/Stream.h>
-#include <lilwil/Suite.h>
+#include <lilwil/Impl.h>
 #include <iostream>
 #include <sstream>
 
+#include <shared_mutex>
 
-
-#if __has_include(<cxxabi.h>)
+#if !defined(LILWIL_NO_ABI) && __has_include(<cxxabi.h>)
 #   include <cxxabi.h>
 
     namespace lilwil {
@@ -23,6 +23,11 @@
             if (!buff) return t.name();
             demangle_raii guard{buff};
             std::string out = buff;
+            while (true) {
+                auto pos = out.rfind("::__1::");
+                if (pos == std::string::npos) break;
+                out.erase(pos, 5);
+            }
             return out;
         }
 
@@ -75,32 +80,62 @@ std::invalid_argument Value::no_conversion(std::type_info const &dest) const {
     return std::invalid_argument(os.str());
 }
 
+/******************************************************************************/
+
+#ifdef LILWIL_NO_MUTEX
+    Suite & suite() {
+        static Suite static_suite;
+        return static_suite;
+    }
+#else
+    std::pair<Suite &, Mutex &> suite() {
+        static Suite static_suite;
+        static Mutex static_mutex;
+        return {static_suite, static_mutex};
+    }
+#endif
+
+/******************************************************************************/
+
 Value call(std::string_view s, Context c, ArgPack pack) {
-    auto const &cases = suite();
-    auto it = std::find_if(cases.begin(), cases.end(), [=](auto const &c) {return c.name == s;});
-    if (it == cases.end())
-        throw std::runtime_error("Test case \"" + std::string(s) + "\" not found");
-    return it->function(c, pack);
+    return read_suite([&](auto const &cases) {
+        auto it = std::find_if(cases.begin(), cases.end(), [=](auto const &c) {return c.name == s;});
+        if (it == cases.end())
+            throw std::out_of_range("Test case \"" + std::string(s) + "\" not found");
+        return it->function(c, pack);
+    });
 }
 
-Value get_value(std::string_view s) {
-    auto const &cases = suite();
-    auto it = std::find_if(cases.begin(), cases.end(), [=](auto const &c) {return c.name == s;});
-    if (it == cases.end())
-        throw std::runtime_error("Test case \"" + std::string(s) + "\" not found");
-    ValueAdapter const *p = it->function.target<ValueAdapter>();
-    if (!p)
-        throw std::runtime_error("Test case \"" + std::string(s) + "\" is not a simple value");
-    return p->value;
+void add_value(std::string_view s, Value v) {
+    add_test(TestCase{std::string(s), {}, ValueAdapter{std::move(v)}, {}});
 }
 
-Suite & suite() {
-    static std::deque<TestCase> static_suite;
-    return static_suite;
+void set_value(std::string_view s, Value v) {
+    write_suite([&](auto &cases) {
+        auto it = std::remove_if(cases.begin(), cases.end(), [s](auto const &c) {return c.name == s;});
+        cases.erase(it, cases.end());
+        cases.emplace_back(TestCase{std::string(s), {}, ValueAdapter{std::move(v)}, {}});
+    });
+}
+
+Value get_value(std::string_view s, bool allow_missing) {
+    return read_suite([&](auto const &cases) -> Value {
+        auto it = std::find_if(cases.begin(), cases.end(), [s](auto const &c) {return c.name == s;});
+        if (it == cases.end()) {
+            if (allow_missing) return {};
+            throw std::out_of_range("Test case \"" + std::string(s) + "\" not found");
+        }
+        ValueAdapter const *p = it->function.template target<ValueAdapter>();
+        if (p) return p->value;
+        if (allow_missing) return {};
+        throw std::out_of_range("Test case \"" + std::string(s) + "\" is not a simple value");
+    });
 }
 
 void add_test(TestCase t) {
-    suite().emplace_back(std::move(t));
+    write_suite([&](auto &cases) {
+        cases.emplace_back(std::move(t));
+    });
 }
 
 /******************************************************************************/

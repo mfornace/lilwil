@@ -21,11 +21,11 @@ struct Event {
     constexpr Event(type v) : index(v) {}
 };
 
-inline constexpr Event Failure = 0;
-inline constexpr Event Success = 1;
+inline constexpr Event Failure   = 0;
+inline constexpr Event Success   = 1;
 inline constexpr Event Exception = 2;
-inline constexpr Event Timing = 3;
-inline constexpr Event Skipped = 4;
+inline constexpr Event Timing    = 3;
+inline constexpr Event Skipped   = 4;
 
 /******************************************************************************/
 
@@ -40,6 +40,7 @@ using Counter = std::atomic<std::size_t>;
 /******************************************************************************/
 
 /// Base class for emitting messages to a list of Handlers
+/// Basically, within the scope of a test case BaseContext is freely copyable and movable with not much overhead.
 struct BaseContext {
     /// Vector of Handlers for each registered Event
     Vector<Handler> handlers;
@@ -118,6 +119,8 @@ struct BaseContext {
 /******************************************************************************/
 
 /// Provides convenient member functions for common assertions and workflows
+/// If you want to extend this with your behavior, probably easiest to define your
+/// class which BaseContext or Context is implicitly convertible to.
 struct Context : BaseContext {
     using BaseContext::BaseContext;
 
@@ -264,6 +267,15 @@ struct Context : BaseContext {
             throw;
         } catch (...) {return require(false);}
     }
+};
+
+/******************************************************************************/
+
+struct Timer {
+    Clock::time_point start;
+    double &duration;
+    Timer(double &d) : start(Clock::now()), duration(d) {}
+    ~Timer() {duration = std::chrono::duration<double>(Clock::now() - start).count();}
 };
 
 /******************************************************************************/

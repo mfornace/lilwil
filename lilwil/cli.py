@@ -40,11 +40,12 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
 
     t = p.add_argument_group('console output options')
     s(t, '--quiet',            '-q', help='prevent command line output (at least from Python)')
-    s(t, '--failure',          '-f', help='show outputs for failure events')
-    s(t, '--success',          '-s', help='show outputs for success events')
-    s(t, '--exception',        '-e', help='show outputs for exception events')
-    s(t, '--timing',           '-t', help='show outputs for timing events')
-    s(t, '--skip',             '-k', help='show skipped tests')
+    s(t, '--no-default',       '-0', help='do not show outputs by default')
+    s(t, '--failure',          '-f', help='show outputs for failure events (on by default)')
+    s(t, '--success',          '-s', help='show outputs for success events (off by default)')
+    s(t, '--exception',        '-e', help='show outputs for exception events (on by default)')
+    s(t, '--timing',           '-t', help='show outputs for timing events (on by default)')
+    s(t, '--skip',             '-k', help='show skipped tests (on by default)')
     s(t, '--brief',            '-b', help='abbreviate output (e.g. skip ___ lines)')
     s(t, '--no-color',         '-n', help='do not use ASCI colors in command line output')
     s(t, '--no-sync',          '-y', help='show console output asynchronously')
@@ -84,7 +85,7 @@ def run_suite(lib, keypairs, masks, gil, cout, cerr, exe=map):
 
 ################################################################################
 
-def main(run=run_suite, lib='libwil', list=False, failure=False, success=False, brief=False,
+def main(run=run_suite, lib='libwil', list=False, no_default=False, failure=False, success=False, brief=False,
     exception=False, timing=False, quiet=False, capture=False, gil=False, exclude=False,
     no_color=False, regex=None, out='stdout', out_mode='w', xml=None, xml_mode='a+b', suite='lilwil',
     teamcity=None, json=None, json_indent=None, jobs=0, tests=None, params=None, skip=False, no_sync=None):
@@ -95,10 +96,16 @@ def main(run=run_suite, lib='libwil', list=False, failure=False, success=False, 
     keypairs = tuple(parametrized_indices(lib, indices, load_parameters(params)))
 
     if list:
-        print('\n'.join(lib.test_info(i[0])[0] for i in keypairs))
+        fmt = '%{}d: %s'.format(len(str(len(keypairs))))
+        for i, k in enumerate(keypairs):
+            print(fmt % (i, lib.test_info(k[0])[0]))
         return
 
-    mask = (failure, success, exception, timing, skip)
+    if no_default:
+        mask = (failure, success, exception, timing, skip)
+    else:
+        mask = (True, success, True, True, True)
+
     info = lib.compile_info()
 
     with ExitStack() as stack:
