@@ -26,6 +26,15 @@ static bool disclaimer_dummy = disclaimer();
 
 /******************************************************************************/
 
+// if it's desired to avoid copying, addresses are automatically dereferenced
+template <class T>
+struct ToString<T *> {
+    String operator()(T const *t) const {
+        if (!t) return "null";
+        return ToString<T>()(*t);
+    }
+};
+
 template <class T>
 struct ToString<T, std::void_t<decltype(std::declval<std::ostream &>() << std::declval<T const &>())>> {
     std::string operator()(T const &t) const {

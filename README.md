@@ -10,6 +10,7 @@
 - **customizable**: easy to add parser arguments or global values via Python
 - **extensible**: straightforward to customize the `Context`, `Handler`, and formatting APIs to your liking.
 - **low macros**: macros are opt-in and kept to a minimum (see `Macros.h`).
+- **loggable**: test outputs can be recorded in JUnit XML, TeamCity, or native JSON format files.
 
 Along with these features are a few costs:
 
@@ -25,6 +26,7 @@ I've found that these costs are well worth it, and most of my code for the last 
 
 - [lilwil](#lilwil)
   - [Contents](#contents)
+  - [Simple usage](#simple-usage)
   - [Install](#install)
     - [Requirements](#requirements)
     - [Python](#python)
@@ -62,6 +64,32 @@ I've found that these costs are well worth it, and most of my code for the last 
   - [Notes](#notes)
   - [Global suite implementation / thread safety](#global-suite-implementation--thread-safety)
 
+## Simple usage
+
+```c++
+#include <lilwil/Context.h>
+#include <lilwil/Macros.h>
+
+UNIT_TEST("mytest/check-something") = [](lilwil::Context ct) {
+    // log a single key pair of information before an assertion.
+    ct.info("value", 1.5);
+
+    ct("a message", "another message", 10.5, ...); // log some messages
+
+    ct(HERE); // log source file location.
+
+    ct(GLUE(5 + 5)); // same as ct.info("5 + 5", 10);
+
+    bool ok = ct(HERE).require(1 < 2, "should be true"); // chain statements together if convenient
+
+    // A variety of obvious wrappers for require are included. See Context API for more details.
+    ct(HERE).equal(5, 5);
+    ct(HERE).less(4, 5);
+};
+```
+
+A little more advanced functionality:
+
 ## Install
 
 ### Requirements
@@ -70,12 +98,12 @@ I've found that these costs are well worth it, and most of my code for the last 
 - CPython 3.3+ (2.7 may work but it hasn't been tested lately). Only the include directory is needed (there is no build-time linking).
 
 ### Python
-Run `pip install .` or `python setup.py install` in the directory where setup.py is. (To do: put on PyPI.)
+At configure time, CMake will generate an executable Python script `test.py` (replace `test` with the output name you specify for `lilwil_module`). This file can also be imported as a module from your own script. It's only a few lines which call `lilwil.cli`, but it gives some pointers on customizing the Python runner and includes the `lilwil` Python module path.
 
-The module `lilwil.cli` is included for command line usage. It can be run directly as a script `python -m lilwil.cli ...` or imported from your own script. The `lilwil` python package is pure Python, so you can also import it without installing if it's in your `$PYTHONPATH`.
+If you want to, you can ignore the output script completely and write your own. The `lilwil` python package is pure Python, so you can also import it without installing if it's been correctly put in your `sys.path`. Otherwise you can run `pip install .` or `python setup.py install` in the directory where `setup.py` is. (To do: put on PyPI.)
 
-Optional Python dependencies:
-- `termcolor` (highly recommended) for colored output in the Terminal
+The only Python dependencies are optional:
+- `termcolor` for colored output in the Terminal
 - `teamcity-messages` for TeamCity result output
 - `IPython` for colored tracebacks on unexpected Python errors (you probably have this already).
 

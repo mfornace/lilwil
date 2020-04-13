@@ -116,25 +116,36 @@ struct ViewAs<std::string_view, SFINAE> {
 
 /******************************************************************************/
 
-// if it's desired to avoid copying, addresses are automatically dereferenced
-template <class T, class SFINAE>
-struct ToString<T *, SFINAE> {
-    String operator()(T const *t) const {
-        if (!t) return "null";
-        return ToString<T>()(*t);
-    }
-};
-
 String address_to_string(void const *);
 
-// void * pointers are not dereferenced, obviously
-template <class SFINAE>
-struct ToString<void const *, SFINAE> {
+// These are a few no-brainer specializations for ToString
+
+template <>
+struct ToString<char const *> {
+    String operator()(char const *t) const {return t ? t : "null";}
+};
+
+template <>
+struct ToString<std::string_view> {
+    String operator()(std::string_view s) const {return String(s);}
+};
+
+template <>
+struct ToString<String> {
+    String operator()(String s) const {return std::move(s);}
+};
+
+// void * is also included to avoid issues with specializing pointer types
+// i.e. if you specialize T * to print the dereferenced value, you'll get issues
+// with dereferencing a void pointer if this isn't fully specialized
+// it seems like a fairly straightforward print anyway
+template <>
+struct ToString<void const *> {
     String operator()(void const *t) const {return address_to_string(t);}
 };
 
-template <class SFINAE>
-struct ToString<void *, SFINAE> : ToString<void const *, SFINAE> {};
+template <>
+struct ToString<void *> : ToString<void const *> {};
 
 /******************************************************************************/
 
