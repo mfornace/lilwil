@@ -7,7 +7,6 @@
 #include <functional>
 #include <atomic>
 #include <chrono>
-#include <iostream>
 
 namespace lilwil {
 
@@ -81,14 +80,14 @@ struct BaseContext {
     template <class ...Ts>
     void operator()(Ts &&...ts) {
         logs.reserve(logs.size() + sizeof...(Ts));
-        (info(static_cast<Ts &&>(ts)), ...);
+        (info(std::forward<Ts>(ts)), ...);
     }
 
     template <class ...Ts>
     void capture(Ts &&...ts) {
         std::size_t const n = logs.size();
         // put the reserved logs at the end, then shift them forwards into the reserved section
-        (*this)(static_cast<Ts &&>(ts)...);
+        (*this)(std::forward<Ts>(ts)...);
         std::rotate(logs.begin() + reserved_logs, logs.begin() + n, logs.end());
         reserved_logs += logs.size() - n;
     }
@@ -107,7 +106,7 @@ struct BaseContext {
     template <class ...Ts>
     void handle(Event e, Ts &&...ts) {
         if (e.index < handlers.size() && handlers[e.index]) {
-            (*this)(static_cast<Ts &&>(ts)...);
+            (*this)(std::forward<Ts>(ts)...);
             handlers[e.index](e.index, scopes, std::move(logs));
         }
         if (counters && e.index < counters->size())
@@ -124,6 +123,8 @@ struct BaseContext {
 struct Context : BaseContext {
     using BaseContext::BaseContext;
 
+    /**************************************************************************/
+
     template <class T>
     Context & info(T &&t) {BaseContext::info(static_cast<T &&>(t)); return *this;}
 
@@ -131,12 +132,12 @@ struct Context : BaseContext {
     Context & info(K &&k, V &&v) {BaseContext::info(static_cast<K &&>(k), static_cast<V &&>(v)); return *this;}
 
     template <class ...Ts>
-    Context & operator()(Ts &&...ts) {BaseContext::operator()(static_cast<Ts &&>(ts)...); return *this;}
+    Context & operator()(Ts &&...ts) {BaseContext::operator()(std::forward<Ts>(ts)...); return *this;}
 
     Context & operator()(std::initializer_list<KeyPair> const &v) {BaseContext::operator()(v); return *this;}
 
     template <class ...Ts>
-    Context & capture(Ts &&...ts) {BaseContext::capture(static_cast<Ts &&>(ts)...); return *this;}
+    Context & capture(Ts &&...ts) {BaseContext::capture(std::forward<Ts>(ts)...); return *this;}
 
     Context & capture(std::initializer_list<KeyPair> const &v) {BaseContext::capture(v); return *this;}
 
@@ -145,11 +146,13 @@ struct Context : BaseContext {
     auto section(std::string name, F &&functor, Ts &&...ts) const {
         Context ctx(scopes, handlers, counters);
         ctx.scopes.push_back(std::move(name));
-        return static_cast<F &&>(functor)(std::move(ctx), static_cast<Ts &&>(ts)...);
+        return static_cast<F &&>(functor)(std::move(ctx), std::forward<Ts>(ts)...);
     }
 
+    /******************************************************************************/
+
     template <class ...Ts>
-    void timing(Ts &&...ts) {handle(Timing, static_cast<Ts &&>(ts)...);}
+    void timing(Ts &&...ts) {handle(Timing, std::forward<Ts>(ts)...);}
 
     template <class F, class ...Args>
     auto timed(std::size_t n, F &&f, Args &&...args) {
@@ -171,7 +174,7 @@ struct Context : BaseContext {
     template <class Bool=bool, class ...Ts>
     bool require(Bool const &ok, Ts &&...ts) {
         bool b = static_cast<bool>(unglue(ok));
-        handle(b ? Success : Failure, static_cast<Ts &&>(ts)..., glue("value", ok));
+        handle(b ? Success : Failure, std::forward<Ts>(ts)..., glue("value", ok));
         return b;
     }
 
@@ -179,14 +182,17 @@ struct Context : BaseContext {
 
     template <class L, class R, class ...Ts>
     auto equal(L const &l, R const &r, Ts &&...ts) {
-        return require(unglue(l) == unglue(r), comparison_glue(l, r, "=="), static_cast<Ts &&>(ts)...);
+        return require(unglue(l) == unglue(r), comparison_glue(l, r, "=="), std::forward<Ts>(ts)...);
+    }
+
+    template <class Comp, class L, class R, class ...Ts>
+    auto all(char const *op, Comp const &comp, L const &l, R const &r, Ts &&...ts) {
+        return all_unglued(comp, unglue(l), unglue(r), comparison_glue(l, r, op), std::forward<Ts>(ts)...);
     }
 
     template <class L, class R, class ...Ts>
     auto all_equal(L const &l, R const &r, Ts &&...ts) {
-        auto const &x2 = unglue(l);
-        auto const &y2 = unglue(r);
-        return require(std::equal(begin(x2), end(x2), begin(y2), end(y2)), comparison_glue(l, r, "=="), static_cast<Ts &&>(ts)...);
+        return all_unglued(std::equal_to<>(), unglue(l), unglue(r), comparison_glue(l, r, "=="), std::forward<Ts>(ts)...);
     }
 
     template <class L, class R, class ...Ts>
@@ -195,52 +201,52 @@ struct Context : BaseContext {
         auto const &y2 = unglue(r);
         auto const comp = ApproxEquals<typename ApproxType<std::decay_t<decltype(*begin(x2))>,
                                                            std::decay_t<decltype(*begin(y2))>>::type>();
-        return require(std::equal(begin(x2), end(x2), begin(y2), end(y2), comp), comparison_glue(l, r, "~"), static_cast<Ts &&>(ts)...);
+        return all_unglued(comp, unglue(l), unglue(r), comparison_glue(l, r, "~"), std::forward<Ts>(ts)...);
     }
 
     template <class L, class R, class ...Ts>
     bool not_equal(L const &l, R const &r, Ts &&...ts) {
-        return require(unglue(l) != unglue(r), comparison_glue(l, r, "!="), static_cast<Ts &&>(ts)...);
+        return require(unglue(l) != unglue(r), comparison_glue(l, r, "!="), std::forward<Ts>(ts)...);
     }
 
     template <class L, class R, class ...Ts>
     bool less(L const &l, R const &r, Ts &&...ts) {
-        return require(unglue(l) < unglue(r), comparison_glue(l, r, "<"), static_cast<Ts &&>(ts)...);
+        return require(unglue(l) < unglue(r), comparison_glue(l, r, "<"), std::forward<Ts>(ts)...);
     }
 
     template <class L, class R, class ...Ts>
     bool greater(L const &l, R const &r, Ts &&...ts) {
-        return require(unglue(l) > unglue(r), comparison_glue(l, r, ">"), static_cast<Ts &&>(ts)...);
+        return require(unglue(l) > unglue(r), comparison_glue(l, r, ">"), std::forward<Ts>(ts)...);
     }
 
     template <class L, class R, class ...Ts>
     bool less_eq(L const &l, R const &r, Ts &&...ts) {
-        return require(unglue(l) <= unglue(r), comparison_glue(l, r, "<="), static_cast<Ts &&>(ts)...);
+        return require(unglue(l) <= unglue(r), comparison_glue(l, r, "<="), std::forward<Ts>(ts)...);
     }
 
     template <class L, class R, class ...Ts>
     bool greater_eq(L const &l, R const &r, Ts &&...ts) {
-        return require(unglue(l) >= unglue(r), comparison_glue(l, r, ">="), static_cast<Ts &&>(ts)...);
+        return require(unglue(l) >= unglue(r), comparison_glue(l, r, ">="), std::forward<Ts>(ts)...);
     }
 
     template <class T, class L, class R, class ...Ts>
     bool within(T const &tol, L const &l, R const &r, Ts &&...ts) {
         ComparisonGlue<L const &, R const &> expr{l, r, "~"};
-        if (l == r) return require(true, expr, static_cast<Ts &&>(ts)...);
+        if (l == r) return require(true, expr, std::forward<Ts>(ts)...);
         auto const a = l - r;
         auto const b = r - l;
         bool ok = (a < b) ? static_cast<bool>(b < tol) : static_cast<bool>(a < tol);
-        return require(ok, expr, glue("tolerance", tol), glue("difference", b), static_cast<Ts &&>(ts)...);
+        return require(ok, expr, glue("tolerance", tol), glue("difference", b), std::forward<Ts>(ts)...);
     }
 
     template <class T, class L, class R, class ...Ts>
     bool log_within(T const &tol, L const &l, R const &r, Ts &&...ts) {
         ComparisonGlue<L const &, R const &> expr{l, r, "~"};
-        if (l == r) return require(true, expr, static_cast<Ts &&>(ts)...);
+        if (l == r) return require(true, expr, std::forward<Ts>(ts)...);
         auto const a = (l - r) / r;
         auto const b = (r - l) / l;
         bool ok = (a < b) ? static_cast<bool>(b < tol) : static_cast<bool>(a < tol);
-        return require(ok, expr, glue("tolerance", tol), glue("difference", b), static_cast<Ts &&>(ts)...);
+        return require(ok, expr, glue("tolerance", tol), glue("difference", b), std::forward<Ts>(ts)...);
     }
 
     template <class L, class R, class ...Args>
@@ -266,6 +272,13 @@ struct Context : BaseContext {
         } catch (ClientError const &e) {
             throw;
         } catch (...) {return require(false);}
+    }
+
+    /**************************************************************************/
+
+    template <class Comp, class L, class R, class Glue, class ...Ts>
+    auto all_unglued(Comp const &comp, L const &l, R const &r, Glue const &glue, Ts &&...ts) {
+        return require(std::equal(begin(l), end(l), begin(r), end(r), comp), glue, std::forward<Ts>(ts)...);
     }
 };
 

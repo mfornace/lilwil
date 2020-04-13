@@ -1,12 +1,30 @@
 #include <lilwil/Test.h>
 #include <lilwil/Macros.h>
 #include <iostream>
+#include <sstream>
 #include <any>
+#include <deque>
 #include <complex>
 #include <shared_mutex>
 
+/******************************************************************************/
+
 namespace lilwil {
 
+bool disclaimer() {
+    std::cout <<
+    "\n********************************************************************************\n"
+    "These tests are to manually test behavior including exceptions and failures "
+    "so do not be disturbed by the presence of exceptions and failures in the following "
+    "output..."
+    "\n********************************************************************************\n"
+    << std::endl;
+    return true;
+}
+
+static bool disclaimer_dummy = disclaimer();
+
+/******************************************************************************/
 
 template <class T>
 struct ToString<T, std::void_t<decltype(std::declval<std::ostream &>() << std::declval<T const &>())>> {
@@ -17,18 +35,12 @@ struct ToString<T, std::void_t<decltype(std::declval<std::ostream &>() << std::d
     }
 };
 
+/******************************************************************************/
 
 }
 
-template <class T>
-using SizeOf = std::integral_constant<std::size_t, sizeof(T)>;
-
-// static_assert(SizeOf<std::shared_ptr<void>>() == 16); // 64
-// static_assert(SizeOf<std::mutex>() == 64); // 64
-// static_assert(SizeOf<std::shared_timed_mutex>() == 168); // 168
-
 struct goo {
-    friend std::ostream & operator<<(std::ostream &os, goo) {return os << "goo";}
+    friend std::ostream & operator<<(std::ostream &os, goo) {return os << "goo()";}
 };
 
 namespace lilwil {
@@ -40,7 +52,7 @@ namespace lilwil {
 
 /******************************************************************************/
 
-auto test1 = unit_test("test-1", COMMENT("This is a test"), [](lilwil::Context ct) {
+auto test1 = unit_test("general-usage", COMMENT("This is a test"), [](lilwil::Context ct) {
     ct("a message");
     int n = ct.section("new-section", [](lilwil::Context ct) {
         ct.equal(3, 4);
@@ -64,45 +76,57 @@ auto test1 = unit_test("test-1", COMMENT("This is a test"), [](lilwil::Context c
     return std::vector<goo>(1);
 });
 
-UNIT_TEST("test-2", "This is a test 2") = [](lilwil::Context ct) {
-    std::cerr << "Hey I am std::cerr 2" << std::endl;
-    std::cout << "Hey I am std::cout 2" << std::endl;
-
-
-    std::cout << sizeof(bool)  << " sizeof(bool) " << std::endl;
-    std::cout << sizeof(std::any)  << " sizeof(std::any) " << std::endl;
-    std::cout << sizeof(lilwil::Integer)  << " sizeof(Integer) " << std::endl;
-    std::cout << sizeof(lilwil::Real)  << " sizeof(Real) " << std::endl;
-    std::cout << sizeof(std::complex<lilwil::Real>)  << " sizeof(std::complex<Real>) " << std::endl;
-    std::cout << sizeof(std::string)  << " sizeof(std::string) " << std::endl;
-    std::cout << sizeof(std::string_view) << " sizeof(std::string_view)" << std::endl;
-    std::cout << sizeof(lilwil::Value) << " sizeof(Value)" << std::endl;
-
-        return 8.9;
-    //return "hello";
-    // if (!ct.throws_as<std::runtime_error>([]{})) return;
+UNIT_TEST("looking-at-sizeof", "This is a test 2") = [](lilwil::Context ct) {
+    ct(GLUE(sizeof(bool)));
+    ct(GLUE(sizeof(lilwil::Integer)));
+    ct(GLUE(sizeof(lilwil::Real)));
+    ct(GLUE(sizeof(std::complex<lilwil::Real>)));
+    ct(GLUE(sizeof(std::string_view)));
+    ct(GLUE(sizeof(std::string)));
+    ct(GLUE(sizeof(std::vector<int>)));
+    ct(GLUE(sizeof(std::deque<int>)));
+    ct(GLUE(sizeof(std::any)));
+    ct(GLUE(sizeof(lilwil::Value)));
+    ct(HERE).require(true);
+    return 8.9;
 };
 
-UNIT_TEST("test-3") = [](auto ct) {
-    std::cout << "ok1" << std::endl;
-    // lilwil::add_value("max_time", 2.0);
+UNIT_TEST("add-get-value") = [](lilwil::Context ct) {
+    lilwil::add_value("max_time", 2.0);
     std::cout << lilwil::get_value("max_time").view_as<double>() << std::endl;
-    std::cout << "ok2" << std::endl;
-    throw std::runtime_error("runtime_error: uh oh");
+    ct(HERE).throw_as<std::runtime_error>([]{throw std::runtime_error("runtime_error: uh oh");});
 };
 
 
-UNIT_TEST("test-4") = [](lilwil::Context ct, goo const &) {
+UNIT_TEST("skipped-test/with-parameters") = [](lilwil::Context ct, goo const &) {
     // return goo();
-    ct.equal(5, 5);
+    ct(HERE).equal(5, 5);
     throw lilwil::Skip("this test is skipped");
 };
 
+UNIT_TEST("skipped-test/no-parameters") = [](lilwil::Context ct) {
+    // return goo();
+    ct(HERE).equal(5, 5);
+    ct(HERE).handle(lilwil::Skipped, "this test is skipped");
+};
+
+
 std::shared_timed_mutex mut;
 
-UNIT_TEST("test-6") = [](auto ct) {
-    ct.timed(10, [&]{std::unique_lock<std::shared_timed_mutex> lock(mut);});
-    ct.timed(10, [&]{std::shared_lock<std::shared_timed_mutex> lock(mut);});
+UNIT_TEST("shared_timed_mutex/timing") = [](auto ct) {
+    ct(HERE, "unique_lock").timed(1000, [&]{std::unique_lock<std::shared_timed_mutex> lock(mut);});
+    ct(HERE, "shared_lock").timed(1000, [&]{std::shared_lock<std::shared_timed_mutex> lock(mut);});
+};
+
+UNIT_TEST("pipeline/1") = [](auto ct) -> std::tuple<std::string_view, double, bool, goo> {
+    return {"something", 5.5, true, goo()};
+};
+
+UNIT_TEST("pipeline/2") = [](lilwil::Context ct) {
+    auto v = lilwil::call("pipeline/1", ct).view_as<std::tuple<std::string_view, double, bool, goo>>();
+    ct(HERE,  "check pipeline output").equal(std::get<0>(v), "something");
+    ct(HERE,  "check pipeline output").equal(std::get<1>(v), 5.5);
+    ct(HERE,  "check pipeline output").equal(std::get<2>(v), true);
 };
 
 void each(double) {}
@@ -123,12 +147,15 @@ template <class T=std::initializer_list<lilwil::KeyPair>>
 void test_var2(T t) {for (auto i: t) each(std::move(i));}
 
 UNIT_TEST("test-5") = [](auto ct) {
-    ct.equal(5, 5);
+    ct(HERE).equal(5, 5);
     test_var(6, 5.5);
     test_var({"hmm", 5.5});
     test_var({"hmm", 5.5}, {"hmm", 5.5});
     test_var2({{"hmm", 5.5}, {"hmm", 5.5}});
-    ct.all_equal(std::string(), std::string());
+    ct(HERE).all_equal(std::string("abc"), std::string("abc"));
+    ct(HERE).all_equal(std::vector<int>{1,2,3}, std::vector<int>{1,2,4});
+    ct(HERE).all_equal(std::vector<int>{1,2,3}, std::vector<int>{1,2,3,3});
+    ct(HERE).all("<", std::less<>(), std::vector<int>{1,2,3}, std::vector<int>{2,5,4});
 };
 
 /******************************************************************************/

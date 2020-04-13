@@ -151,7 +151,7 @@ def exit_main(no_color=False, **kwargs):
     try:
         main(no_color=no_color, **kwargs)
         return
-    except BaseException as e:
+    except Exception as e:
         if no_color:
             raise
         x = e

@@ -23,8 +23,8 @@ class Colorer:
         self.colored = colored if colors else not_colored
         self.stream_footer = '' if brief else '_' * 22 + '\n'
         self.footer = '' if brief else '_' * 80 + '\n'
-        self.stderr = self.colored('Contents of std::err', 'magenta')
-        self.stdout = self.colored('Contents of std::out', 'magenta')
+        self.stderr = self.colored('Contents of std::cerr', 'magenta')
+        self.stdout = self.colored('Contents of std::cout', 'magenta')
         self.test_duration = self.colored('Test duration', 'yellow')
         self.total_duration = self.colored('Total duration', 'yellow')
 

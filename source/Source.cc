@@ -110,11 +110,13 @@ void add_value(std::string_view s, Value v) {
     add_test(TestCase{std::string(s), {}, ValueAdapter{std::move(v)}, {}});
 }
 
-void set_value(std::string_view s, Value v) {
-    write_suite([&](auto &cases) {
+bool set_value(std::string_view s, Value v) {
+    return write_suite([&](auto &cases) {
         auto it = std::remove_if(cases.begin(), cases.end(), [s](auto const &c) {return c.name == s;});
-        cases.erase(it, cases.end());
+        bool erased = (it != cases.end());
+        if (erased) cases.erase(it, cases.end());
         cases.emplace_back(TestCase{std::string(s), {}, ValueAdapter{std::move(v)}, {}});
+        return erased;
     });
 }
 
@@ -136,6 +138,14 @@ void add_test(TestCase t) {
     write_suite([&](auto &cases) {
         cases.emplace_back(std::move(t));
     });
+}
+
+/******************************************************************************/
+
+String address_to_string(void const *p) {
+    std::ostringstream os;
+    os << p;
+    return os.str();
 }
 
 /******************************************************************************/

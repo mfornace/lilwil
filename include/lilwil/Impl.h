@@ -11,7 +11,7 @@ namespace lilwil {
 
 /******************************************************************************/
 
-#include <deque>
+#include <vector>
 
 #ifndef LILWIL_NO_MUTEX
 #   if !__has_include(<shared_mutex>)
@@ -27,7 +27,7 @@ namespace lilwil {
 /******************************************************************************/
 
 #ifndef LILWIL_NO_MUTEX
-    using Suite = std::deque<TestCase>;
+    using Suite = std::vector<TestCase>;
     using Mutex = std::shared_timed_mutex;
     std::pair<Suite &, Mutex &> suite();
 
@@ -45,7 +45,7 @@ namespace lilwil {
         return f(static_cast<Suite const &>(p.first));
     }
 #else
-    using Suite = std::deque<TestCase>;
+    using Suite = std::vector<TestCase>;
     using Mutex = void;
     Suite & suite();
 

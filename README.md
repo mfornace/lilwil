@@ -64,6 +64,11 @@ Run `pip install .` or `python setup.py install` in the directory where setup.py
 
 The module `lilwil.cli` is included for command line usage. It can be run directly as a script `python -m lilwil.cli ...` or imported from your own script. The `lilwil` python package is pure Python, so you can also import it without installing if it's in your `$PYTHONPATH`.
 
+Optional Python dependencies:
+- `termcolor` (highly recommended) for colored output in the Terminal
+- `teamcity-messages` for TeamCity result output
+- `IPython` for colored tracebacks on unexpected Python errors (you probably have this already).
+
 ### CMake
 Write a CMake target for your own shared library(s). Use CMake function `lilwil_module(my_shared_target...)` to define a new CMake python module target based on that library.
 
@@ -587,13 +592,13 @@ In addition, null values can be created and passed in. There might be some compl
 
 ## Global suite implementation / thread safety
 
-Some custom behavior is allowed for the global test suite. What needs to be met is the read_suite / write_suite interface below, which call functors in a thread-safe manner on a STL container like deque. Define `LILWIL_CUSTOM_SUITE` to your own header to define your own behavior completely. Otherwise, define `LILWIL_NO_MUTEX` to avoid locking around the test suite, which is in general fine except when modifying global tests or values from *within* a test. `LILWIL_NO_MUTEX` will be assumed if `<shared_mutex>` is unavailable, but a warning will be issued in this case.
+Some custom behavior is allowed for the global test suite. What needs to be met is the read_suite / write_suite interface below, which call functors in a thread-safe manner on a STL container like vector. Define `LILWIL_CUSTOM_SUITE` to your own header to define your own behavior completely. Otherwise, define `LILWIL_NO_MUTEX` to avoid locking around the test suite, which is in general fine except when modifying global tests or values from *within* a test. `LILWIL_NO_MUTEX` will be assumed if `<shared_mutex>` is unavailable, but a warning will be issued in this case.
 
 The non-threadsafe interface is as follows:
 
 ```c++
-std::deque<TestCase> & suite() {
-    static std::deque<TestCase> static_suite;
+std::vector<TestCase> & suite() {
+    static std::vector<TestCase> static_suite;
     return static_suite;
 }
 

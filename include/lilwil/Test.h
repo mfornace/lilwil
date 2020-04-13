@@ -187,14 +187,12 @@ Value call(std::string_view s, Context c, Ts &&...ts) {
 /// - allow_missing == true: returns an empty Value
 Value get_value(std::string_view key, bool allow_missing=false);
 
-// Setters are not exposed because this would be potentially unthreadsafe
-// It's possible we could put locks around the global suite in the future to allow this
-
 /// Set a value, removing any prior test cases that had the same key
-// Value & set_value(std::string_view key, Value v);
+/// - return whether prior test cases were removed
+bool set_value(std::string_view key, Value v);
 
 /// Add a value to the test suite
-// Value & add_value(std::string_view key, Value v);
+void add_value(std::string_view key, Value v);
 
 /******************************************************************************/
 

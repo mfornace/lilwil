@@ -116,4 +116,26 @@ struct ViewAs<std::string_view, SFINAE> {
 
 /******************************************************************************/
 
+// if it's desired to avoid copying, addresses are automatically dereferenced
+template <class T, class SFINAE>
+struct ToString<T *, SFINAE> {
+    String operator()(T const *t) const {
+        if (!t) return "null";
+        return ToString<T>()(*t);
+    }
+};
+
+String address_to_string(void const *);
+
+// void * pointers are not dereferenced, obviously
+template <class SFINAE>
+struct ToString<void const *, SFINAE> {
+    String operator()(void const *t) const {return address_to_string(t);}
+};
+
+template <class SFINAE>
+struct ToString<void *, SFINAE> : ToString<void const *, SFINAE> {};
+
+/******************************************************************************/
+
 }
