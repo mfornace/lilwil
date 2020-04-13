@@ -1,5 +1,11 @@
 # lilwil
-
+  _ _ _          _ _ 
+ | (_) |        (_) |
+ | |_| |_      ___| |
+ | | | \ \ /\ / / | |
+ | | | |\ V  V /| | |
+ |_|_|_| \_/\_/ |_|_|
+                     
 `lilwil` is an open-source unit test framework targeting C++17. Some of the major features of `lilwil` are that it's:
 
 - **easy to use**: front-end work (argument parsing, etc.) is offloaded to Python as much as possible.
