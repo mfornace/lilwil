@@ -1,63 +1,73 @@
-## Function
+# lilwil
 
-Function is a model of `Vector<Reference> -> Value`.
+`lilwil` is an open-source unit test framework targeting C++17. Some of the major features of `lilwil` are that it's:
+
+- **easy to use**: front-end work (argument parsing, etc.) is offloaded to Python as much as possible.
+- **natively parallel**: the built-in runner uses a Python `ThreadPoolExecutor`, and the exposed test API is threadsafe.
+- **parameterized**: tests have built-in support for parameters and return values.
+- **composable**: define and call tests from other tests using `std::any` type erasure.
+- **modular**: The Python API is kept completely separate from your C++ code (and can even be swapped out entirely). `Handler`s are implemented using `std::function` type erasure.
+- **customizable**: easy to add parser arguments or global values via Python
+- **extensible**: straightforward to customize the `Context`, `Handler`, and formatting APIs to your liking.
+- **low macros**: macros are opt-in and kept to a minimum (see `Macros.h`).
+
+Along with these features are a few costs:
+
+- `lilwil` needs C++17 support. Modern versions of clang and gcc have been found to work fine.
+- `lilwil` needs build-time access to the Python C API headers. It doesn't need to link to Python though, and these headers are not included by your C++ tests.
+- `lilwil` is not header-only, in order to achieve modularity and reduce compile time. See the CMake section for how to incorporate `lilwil` into your project.
+
+I've found that these costs are well worth it, and most of my code for the last few years has used `lilwil` to test and prototype my C++ thesis work.
+
+`lilwil` was inspired by the excellent frameworks `Catch` and `doctest`, which are nice header-only alternatives if the tradeoffs don't make sense for you.
 
 ## Contents
 
-- [Function](#function)
-- [Contents](#contents)
-- [Install](#install)
-  - [Requirements](#requirements)
-  - [Python](#python)
-  - [CMake](#cmake)
-- [Writing tests in C++](#writing-tests-in-c)
-  - [Unit test declaration](#unit-test-declaration)
-  - [`Context` API](#context-api)
-    - [Logging](#logging)
-    - [Test scopes](#test-scopes)
-      - [Sections](#sections)
-      - [Tags](#tags)
-      - [Suites](#suites)
-    - [Assertions](#assertions)
-    - [Leaving a test early](#leaving-a-test-early)
-    - [Timings](#timings)
-    - [Approximate comparison](#approximate-comparison)
-  - [Macros](#macros)
-    - [`Glue` and `AddKeyPairs`](#glue-and-addkeypairs)
-  - [Test adaptors](#test-adaptors)
-    - [C++ type-erased function](#c-type-erased-function)
-    - [Type-erased value](#type-erased-value)
-    - [Python function](#python-function)
-  - [Templated functions](#templated-functions)
-- [Running tests from the command line](#running-tests-from-the-command-line)
-  - [Python threads](#python-threads)
-  - [Writing your own script](#writing-your-own-script)
-  - [An example](#an-example)
-- [`Handler` C++ API](#handler-c-api)
-- [`liblilwil` Python API](#liblilwil-python-api)
-  - [Exposed Python functions via C API](#exposed-python-functions-via-c-api)
-  - [Exposed Python C++ API](#exposed-python-c-api)
-- [`lilwil` Python API](#lilwil-python-api)
-  - [Info](#info)
-  - [Debugger](#debugger)
-- [Done](#done)
-  - [Breaking out of tests early](#breaking-out-of-tests-early)
-  - [CMake](#cmake-1)
-  - [Object size](#object-size)
-  - [Library/module name](#librarymodule-name)
-  - [FileLine](#fileline)
-  - [Exceptions](#exceptions)
-  - [Signals](#signals)
-  - [Caller, Context](#caller-context)
-- [Notes](#notes)
-- [Global suite implementation / thread safety](#global-suite-implementation--thread-safety)
+- [lilwil](#lilwil)
+  - [Contents](#contents)
+  - [Install](#install)
+    - [Requirements](#requirements)
+    - [Python](#python)
+    - [CMake](#cmake)
+  - [Writing tests in C++](#writing-tests-in-c)
+    - [Unit test declaration](#unit-test-declaration)
+    - [`Context` API](#context-api)
+      - [Logging](#logging)
+      - [Test scopes](#test-scopes)
+        - [Sections](#sections)
+        - [Tags](#tags)
+        - [Suites](#suites)
+      - [Assertions](#assertions)
+      - [Leaving a test early](#leaving-a-test-early)
+      - [Timings](#timings)
+      - [Approximate comparison](#approximate-comparison)
+    - [Macros](#macros)
+      - [`Glue` and `AddKeyPairs`](#glue-and-addkeypairs)
+    - [Test adaptors](#test-adaptors)
+      - [C++ type-erased function](#c-type-erased-function)
+      - [Type-erased value](#type-erased-value)
+      - [Python function](#python-function)
+    - [Templated functions](#templated-functions)
+  - [Running tests from the command line](#running-tests-from-the-command-line)
+    - [Python threads](#python-threads)
+    - [Writing your own script](#writing-your-own-script)
+    - [An example](#an-example)
+  - [`Handler` C++ API](#handler-c-api)
+  - [`liblilwil` Python API](#liblilwil-python-api)
+    - [Exposed Python functions via C API](#exposed-python-functions-via-c-api)
+    - [Exposed Python C++ API](#exposed-python-c-api)
+  - [`lilwil` Python API](#lilwil-python-api)
+    - [Info](#info)
+    - [Running a debugger](#running-a-debugger)
+  - [Notes](#notes)
+  - [Global suite implementation / thread safety](#global-suite-implementation--thread-safety)
 
 ## Install
 
 ### Requirements
 - CMake 3.8+
-- C++17 (fold expressions, `constexpr bool *_v` traits, `std::any`, `std::string_view`, a few `if constexpr`s)
-- CPython 2.7+ or 3.3+ (not tested very often on 2.7 though)
+- C++17 (fold expressions, `constexpr bool *_v` traits, `std::any`, `std::string_view`, and `if constexpr`)
+- CPython 3.3+ (2.7 may work but it hasn't been tested lately). Only the include directory is needed (there is no build-time linking).
 
 ### Python
 Run `pip install .` or `python setup.py install` in the directory where setup.py is. (To do: put on PyPI.)
@@ -70,7 +80,7 @@ Optional Python dependencies:
 - `IPython` for colored tracebacks on unexpected Python errors (you probably have this already).
 
 ### CMake
-Write a CMake target for your own shared library(s). Use CMake function `lilwil_module(my_shared_target...)` to define a new CMake python module target based on that library.
+Write a CMake target for your own `SHARED` or `OBJECT` library(s). Use the CMake function `lilwil_module(new_target_name new_output_name my_library1 [my_library2, ...])` to define a new CMake Python module target based on that library. The variadic arguments are incorporated simply via `target_link_libraries`.
 
 Run CMake with `-DLILWIL_PYTHON={my python executable}` to customize. CMake's `find_package(Python)` is not used used by default since only the include directory is needed. You can find your include directory from Python via `sysconfig.get_path('include')` if you need to set it manually for some reason.
 
@@ -78,11 +88,11 @@ Run CMake with `-DLILWIL_PYTHON={my python executable}` to customize. CMake's `f
 
 ### Unit test declaration
 Unit tests are functors which:
-- take a first argument of `lilwil::Context` or `lilwil::Context &&`
+- take a first argument of `lilwil::Context`
 - take any other arguments of a type convertible from `lilwil::Value`
-- return void or an object convertible to `lilwil::Value`
+- return `void` or an object convertible to `lilwil::Value`
 
-You can use `auto` instead of `lilwil::Context` if it is the only parameter. You can't use `auto` for the other parameters unless you specialize the `lilwil` signature deduction.
+You can use `auto` instead of `lilwil::Context` if it is the only parameter, though it's a bit unrecommended. You can't use `auto` for the other parameters unless you specialize the `lilwil` signature deduction.
 
 ```c++
 // unit test of the given name
@@ -432,7 +442,7 @@ std::ptrdiff_t n_fail = ct.count(Failure); // const, noexcept; gives -1 if the e
 
 ## `liblilwil` Python API
 
-`liblilwil` refers to the Python extension module being compiled. The `liblilwil` Python handlers all use the official CPython API. Doing so is really not too hard beyond managing `PyObject *` lifetimes.
+`liblilwil` refers to the Python extension module being compiled. The `liblilwil` Python handlers all use the official CPython API. Doing so is not too hard beyond managing `PyObject *` lifetimes.
 
 ### Exposed Python functions via C API
 
@@ -506,11 +516,22 @@ ct(KeyPair(1, 2), KeyPair(3, 4)); // two key pairs
 ct({1, 2}, {3, 4}); // two key pairs
 ```
 
-### Debugger
-- `break_into_debugger()`
-- Goes in same handler? Not sure. Could be a large frame stack.
-- Debugger (hook into LLDB possible?)
+### Running a debugger
+`lilwil` current doesn't expose a `break_into_debugger()`, mostly because I've never used it. It could probably be added in the future.
 
+To debug a test using `lldb` or `gdb`, the only wrinkle seems to be that the python executable should be explicitly listed:
+
+```bash
+lldb -- python3 ./test.py -s "mytest" # ... and other arguments
+```
+
+I don't use gdb, but I assume it would be done analogously:
+
+```bash
+gdb --args python3 ./test.py -s "mytest" # ... and other arguments
+```
+
+<!--
 ## Done
 
 ### Breaking out of tests early
@@ -576,7 +597,7 @@ The test that's handled should therefore be Context.
 
 I guess the current strategy is fine.
 
-Also caller? copyable?
+Also caller? copyable? -->
 
 
 ## Notes
