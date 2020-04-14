@@ -155,22 +155,23 @@ Run CMake with `-DLILWIL_PYTHON={my python executable}` to customize. CMake's `f
 ### Unit test declaration
 Unit tests are functors which:
 - take a first argument of `lilwil::Context`
-- take any other arguments of a type convertible from `lilwil::Value`
 - return `void` or an object convertible to `lilwil::Value`
+- take any other arguments of a type convertible from `lilwil::Value`. (You can use `auto` instead of `lilwil::Context` if it is the only parameter, though it's a bit unrecommended. You can't use `auto` for the other parameters unless you specialize the `lilwil` signature deduction.)
 
-You can use `auto` instead of `lilwil::Context` if it is the only parameter, though it's a bit unrecommended. You can't use `auto` for the other parameters unless you specialize the `lilwil` signature deduction.
-
+If you include `<lilwil/Macros.h>` you can use the following test declaration styles.
 ```c++
-// unit test of the given name
-unit_test("my-test-name", [](lilwil::Context ct, ...) {...});
-// unit test of the given name and comment
-unit_test("my-test-name", "my test comment", [](lilwil::Context ct, ...) {...});
-// unit test of the given name and comment (source location included)
-unit_test("my-test-name", COMMENT("my test comment"), [](lilwil::Context ct, ...) {...});
 // unit test of the given name (source location included)
 UNIT_TEST("my-test-name") = [](lilwil::Context ct, ...) {...};
 // unit test of the given name and comment (source location included)
 UNIT_TEST("my-test-name", "my test comment") = [](lilwil::Context ct, ...) {...};
+```
+
+These are roughly matched to the following non-macro versions:
+```c++
+// unit test of the given name
+lilwil::unit_test("my-test-name", [](lilwil::Context ct, ...) {...});
+// unit test of the given name and comment
+lilwil::unit_test("my-test-name", "my test comment", [](lilwil::Context ct, ...) {...});
 ```
 
 ### `Context` API
