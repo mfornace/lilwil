@@ -180,7 +180,7 @@ You can run CMake with `-DLILWIL_PYTHON={my python executable}` to customize the
 Unit tests are functors which:
 - take a first argument of `lilwil::Context`
 - return `void` or an object convertible to `lilwil::Value`
-- take any other arguments of a type convertible from `lilwil::Value`. (You can use `auto` instead of `lilwil::Context` if it is the only parameter, though it's a bit unrecommended. You can't use `auto` for the other parameters unless you specialize the `lilwil` signature deduction.)
+- take any other arguments of a type convertible from `lilwil::Value`. (You can use `auto` instead of `lilwil::Context` if it is the only parameter, though it's a bit unrecommended. You can't use `auto` for the other parameters unless you specialize the `lilwil` signature deduction.) Currently default arguments are not supported, though I suppose they could be in the future. 
 
 If you include `<lilwil/Macros.h>` you can use the following test declaration styles.
 ```c++
@@ -190,12 +190,25 @@ UNIT_TEST("my-test-name") = [](lilwil::Context ct, ...) {...};
 UNIT_TEST("my-test-name", "my test comment") = [](lilwil::Context ct, ...) {...};
 ```
 
-These are roughly matched to the following non-macro versions:
+These are roughly matched to the following non-macro version (use `static` as necessary):
 ```c++
 // unit test of the given name
-lilwil::unit_test("my-test-name", [](lilwil::Context ct, ...) {...});
+auto test1 = lilwil::unit_test("my-test-name", [](lilwil::Context ct, ...) {...});
+```
+
+Or the compromise version, which includes file and line location:
+```c++
 // unit test of the given name and comment
-lilwil::unit_test("my-test-name", "my test comment", [](lilwil::Context ct, ...) {...});
+auto test2 = lilwil::unit_test("my-test-name", COMMENT("optional comment"), [](lilwil::Context ct, ...) {...});
+```
+
+You also fill add parameter packs to the non-macro version by listing them as the last argument. Each parameter pack will be applied to the test case (as if in series) when the test case is run.
+
+```c++
+// unit test of the given name and comment
+auto test2 = lilwil::unit_test("my-test-name", COMMENT("optional comment"), [](lilwil::Context ct, int i, std::string s) {
+    // test stuff
+}, {{1, "test1"}, {2, "test2"}});
 ```
 
 It is not an error to have unit tests share the same name, though it's not an intended use-case. The test suite will behave like a `multi_map` if this is done. (In literal terms though, the suite is just implemented like a `vector` of `lilwil::TestCase`.)
