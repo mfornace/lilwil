@@ -509,8 +509,7 @@ usage: test.py [-h] [--list] [--lib PATH] [--jobs INT] [--regex RE]
 Run C++ unit tests from Python with the lilwil library
 
 positional arguments:
-                        test names (if not given, specifies all tests that can
-                        be run without any user-specified parameters)
+                        test names (if not given, specifies all tests)
 
 optional arguments:
   -h, --help            show this help message and exit
