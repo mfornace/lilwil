@@ -150,7 +150,7 @@ def exit_main(no_color=False, **kwargs):
     '''
     try:
         main(no_color=no_color, **kwargs)
-        return
+        sys.exit(0)
     except Exception as e:
         if no_color:
             raise
