@@ -32,7 +32,7 @@ I've found that these costs are well worth it, and most of my code for the last 
 
 ## Contents
 
-- [lilwil](#lilwil)
+<!-- - [lilwil](#lilwil) -->
   - [Contents](#contents)
   - [Simple usage](#simple-usage)
   - [Install](#install)
@@ -61,7 +61,7 @@ I've found that these costs are well worth it, and most of my code for the last 
     - [Extending the Python CLI](#extending-the-python-cli)
     - [Python threads](#python-threads)
     - [Running a debugger](#running-a-debugger)
-    - [An example](#an-example)
+    - [An extensibility example](#an-extensibility-example)
   - [Other customization points](#other-customization-points)
     - [`lilwil::ToString`](#lilwiltostring)
     - [`lilwil::AddKeyPairs`](#lilwiladdkeypairs)
@@ -557,7 +557,7 @@ gdb --args python3 ./test.py -s "mytest" # ... and other arguments
 
 I don't use `gdb`, so let me know if you encounter issues with that `gdb` line.
 
-### An example
+### An extensibility example
 
 There is a lot of programmability within your own code for running tests in different styles. Let's use the `Value` registered above to write a helper to repeat a test until the allowed test time is used up.
 
@@ -655,6 +655,9 @@ Since it's so commonly used, `lilwil` tracks the number of times each `Event` is
 std::ptrdiff_t n_fail = ct.count(Failure); // const, noexcept; gives -1 if the event type is out of range
 ```
 
+#### Exceptions
+
+Note that `lilwil::ClientError` and its subclasses are not caught by `Handler`s, so they are propagated to Python. All other subclasses of `std::exception` are handled in place. `std::bad_alloc` is handled as a special case.
 
 ## `liblilwil` Python API
 
@@ -713,9 +716,9 @@ Look in the code for more detail.
 
 ## `lilwil` Python API
 
-Write this.
+In the future I will document more about the Python API in case you want to use `lilwil` more as a Python library.
 
-### Info
+<!-- ### Info
 Finalize `info` API. Just made it return self. Accept variadic arguments? Initializer list?
 ```c++
 ct({"value", 4});
@@ -730,7 +733,7 @@ ct.info({1, 2}); // single key pair (allow?)
 ct(1, 2); // two key pairs with blank keys
 ct(KeyPair(1, 2), KeyPair(3, 4)); // two key pairs
 ct({1, 2}, {3, 4}); // two key pairs
-```
+``` -->
 
 <!--
 ## Done
@@ -765,8 +768,6 @@ The only difference in cost is that
 - I think these are trivial, leave as is.
 - It is flushed on every event (maybe should last for multiple events? or is that confusing?) -->
 
-### Exceptions
-`ClientError` and its subclasses are not caught by test runner. All others are.
 
 <!-- ### Signals
 - possible to use `PyErr_SetInterrupt`
@@ -796,7 +797,7 @@ I guess the current strategy is fine.
 
 Also caller? copyable? -->
 
-## Notes
+## Random notes
 
 We use a slightly adhoc implementation of Value. Any printable, copyable object may be used as a Value. Under the hood, a `std::any` and a type-erased function pointer for printing is used. However, the only guaranteed types that can passed in from the CLI as arguments are builtins:
 - `std::string`
