@@ -24,11 +24,13 @@ Along with these features are a few costs:
 
 - `lilwil` needs C++17 support. Modern versions of clang and gcc have been found to work fine.
 - `lilwil` needs build-time access to the Python C API headers. It doesn't need to link to Python though, and these headers are not included by your C++ tests.
-- `lilwil` is not header-only, in order to achieve modularity and reduce compile time. See the CMake section for how to incorporate `lilwil` into your project.
+- `lilwil` is not header-only, in order to achieve modularity and reduce compile time. See the [CMake](#cmake) section for how to incorporate `lilwil` into your project.
 
 I've found that these costs are well worth it, and most of my code for the last few years has used `lilwil` to test and prototype my C++ thesis work.
 
-`lilwil` was inspired by the excellent frameworks `Catch` and `doctest`, which are nice header-only alternatives if the tradeoffs don't make sense for you.
+`lilwil` was originally inspired by the excellent frameworks `Catch` and `doctest`, which are nice header-only alternatives if the tradeoffs don't make sense for you.
+
+<!-- Please try it out, and feel free to make or suggest any improvements. -->
 
 ## Contents
 
@@ -154,9 +156,14 @@ The only Python dependencies are optional:
 - `IPython` for colored tracebacks on unexpected Python errors (you probably have this already).
 
 ### CMake
-Write a CMake target for your own `SHARED` or `OBJECT` library(s). Use the CMake function `lilwil_module(new_target_name new_output_name my_library1 [my_library2, ...])` to define a new CMake Python module target based on that library. The variadic arguments are incorporated simply via `target_link_libraries`.
+Here's the basic procedure for using `lilwil` via CMake:
+1. Write a CMake target for your own `SHARED` or `OBJECT` library(s) (e.g. `my_library1`).
+2. Include `lilwil` via `add_subdirectory`.
+3. Use the CMake function `lilwil_module(new_target_name new_output_name my_library1 [my_library2, ...])` to define a new CMake Python module target based on that library. The variadic arguments are incorporated simply via `target_link_libraries`.
+4. At configure time, a Python script named `{new_output_name}.py` will be created by CMake in your build directory.
+5. To build the test target, run `make {new_target_name}` with your build tool.
 
-Run CMake with `-DLILWIL_PYTHON={my python executable}` to customize. CMake's `find_package(Python)` is not used used by default since only the include directory is needed. You can find your include directory from Python via `sysconfig.get_path('include')` if you need to set it manually for some reason.
+You can run CMake with `-DLILWIL_PYTHON={my python executable}` to customize the Python to use. (CMake's `find_package(Python)` is not used used by default since only the include directory is needed.) You can find your include directory from Python via `sysconfig.get_path('include')` if you need to set it manually via `LILWIL_PYTHON_INCLUDE` for some reason. Generally speaking, the built library will be compatible with any CPython interpreter of a matching minor version (e.g. 3.6).
 
 ## Using `lilwil` in C++
 
