@@ -28,7 +28,7 @@ Along with these features are a few costs:
 
 `lilwil` was inspired by the excellent frameworks `Catch` and `doctest`, which are nice header-only alternatives if the tradeoffs don't make sense for you.
 
-I've found that these costs are well worth it, and most of my code for the last few years has used `lilwil` to test and prototype my C++ thesis work. As such, it is reasonably stable, but please feel free to suggest improvements, features, and interesting use cases that I haven't thought of.
+I've found that these costs are well worth it, and most of my code for the last few years has used `lilwil` to test and prototype my C++ thesis work. As such, it is fairly stable, but please feel free to contribute (or suggest) improvements, features, and interesting use cases that I haven't thought of.
 
 ## Contents
 
@@ -139,6 +139,7 @@ Results: {Failure: 1, Success: 2}
 ## Install
 
 ### Requirements
+
 - CMake 3.8+
 - C++17 (fold expressions, `constexpr bool *_v` traits, `std::any`, `std::string_view`, and `if constexpr`)
 - CPython 3.3+ (2.7 may work but it hasn't been tested lately). Only the include directory is needed (there is no build-time linking).
@@ -198,7 +199,7 @@ It is not an error to have unit tests share the same name, though it's not an in
 
 ### `lilwil::Context`
 
-`lilwil::Context` is the test runner class. It includes an interface for creating test sections and testing various assertions. `Context` is a derived class of `BaseContext` with no additional members: its sole purpose is to give a decent API for usability. As such, one of the easiest ways to extend `lilwil` is to define your own class inheriting from `Context` with whatever additional methods you want; as long as `Context` is convertible to your class, this will all just work.
+`lilwil::Context` is the primary test runner class. It includes an interface for creating test sections and testing various assertions. `Context` is a derived class of `BaseContext` with no additional members: its sole purpose is to give a decent API for usability. As such, one of the easiest ways to extend `lilwil` is to define your own class inheriting from `Context` with whatever additional methods you want; as long as `Context` is convertible to your class, this will all just work. (You can look at `BaseContext` in `Context.h` too see the raw test runner API.)
 
 Most methods on `Context` are non-const. However, `Context` is fine to be copied or moved around, so it has approximately the same thread safety as usual STL containers (i.e. multiple readers are fine, reading and writing at the same time is bad). (A default-constructed `Context` is valid but not very useful; you shouldn't construct it yourself unless you know what you're doing.)
 
@@ -227,11 +228,11 @@ ct(GLUE(variable) ...);
 bool ok = ct(HERE).require(...);
 ```
 
-It's generally a focus of `lilwil` to make macros small and limited. Whereas a use of `CHECK(...)` might capture the file and line number implicitly in `Catch`, in `lilwil` to get the same thing you need `ct(HERE).require(...)`. See [Macros](#macros) for the (short) list of available macros from `lilwil`.
+It's generally a focus of `lilwil` to make macros small and limited. Whereas a use of `CHECK(...)` might capture the file and line number implicitly in `Catch`, in `lilwil` to get that you need `ct(HERE).require(...)`. See [Macros](#macros) for the (short) list of available macros from `lilwil`.
 
 The intent is generally to yield more transparent C++ code in this regard. However, you're free to define your own macros if you want to shorten your typing more.
 
-Except for primitive values that are builtins in python, the default print behavior in `lilwil` is just to print the `typeid` name of the given object. You will probably want to customize this behavior yourself. To enable `std::ostream` style print, include the following snippet in the global namespace. `ToString` should return something that can be cast to `std::string`.
+Except for primitive values that are builtins in Python, the default print behavior in `lilwil` is just to print the (hopefully demangled) `typeid` name of the given object. You will probably want to customize this behavior yourself. To enable `std::ostream` style print, include the following snippet in the global namespace. `ToString` should return something that can be cast to `std::string`.
 
 ```c++
 template <class T>
@@ -302,12 +303,17 @@ return;
 
 #### Timings
 
+Timing can be done via `.timed()` or `.timing()` as follows:
 ```c++
-// time a long running computation with function arguments args...
-typename Clock::duration elapsed = ct.timed(function_returning_void, args...);
-auto function_result = ct.timed(function_returning_nonvoid, args...);
-// access the start time of the current unit test or section
-typename Clock::time_point &start = ct.start_time;
+// get the result of function(args...) while logging its timing
+auto function_result = ct.timed(function, args...); // may return void
+
+// get and log the time it takes to run function(args...) 10 times
+std::size_t n_repeats = 10;
+typename lilwil::Clock::duration elapsed = ct.timing(n_repeats, function, args...);
+
+// access the start time of the current test or section
+typename lilwil::Clock::time_point &start = ct.start_time;
 ```
 
 #### Approximate comparison
@@ -354,12 +360,12 @@ The standard test takes any type of functor and converts it into (more or less) 
 
 There is also a `Convert` API which is a simple way to customize type conversions. This is exposed via the member function `.view_as<T>() -> T`, which will throw on conversion errors. As implied in the name, `view_as` considers itself free to return a reference-like class (e.g. `std::string_view`), so the `Value` should stay in scope as needed. You can also use `std::any_cast` or the analogous `.target<T>() -> T const *` to access a known type.
 
-This is, I think, a simple but flexible implementation of what is wanted in a test framework. Almost any type is permissible (which helps with test pipelining, etc.), and any `Value` may be printed via `to_string`. On the other hand, the implemented Python handlers handle a few types as special cases:
+This is, I think, a simple but flexible implementation of what is wanted in a test framework. Almost any type is permissible (which helps with test pipelining, etc.), and any `Value` may be printed via `to_string`. On the other hand, the implemented Python APIs handles a few types as special cases:
 
 - integers, floats, bools, and strings are all converted as native Python builtins.
 - empty `Value`s are converted to `None`.
 - there is some support for numeric `ndarray`-style classes via `memoryview`, although I think this will only work for input `Value` arguments. These are usable via `lilwil::ArrayView`.
-- I didn't want to handle Python structured objects in any complicated way, so the default behavior for `dict`, `tuple`, and `list` is to JSON-serialize them and pass them into C++ as a `lilwil::JSON` class. Note that you'll need to bring in your own C++ JSON library (e.g. `nlohmann/json`) to extract the values in C++.
+- I didn't want to handle Python structured objects in any complicated way, so the default behavior for `dict`, `tuple`, and `list` is to JSON-serialize them and pass them into C++ as a `lilwil::JSON` class. Note that you'd need to bring in your own C++ JSON library (e.g. `nlohmann/json`) to extract the values in C++.
 
 Type conversion, especially between languages, is not for the faint of heart, and `lilwil` accordingly tries to as little as possible beyond what is obvious.
 
@@ -371,14 +377,14 @@ If a C++ exception occurs while running this type of test, the runner generally 
 
 This type of test may be called from anywhere in type-erased fashion:
 ```c++
-Value output = call("my-test-name", (Context) ct, args...);
+Value output = lilwil::call("my-test-name", (Context) ct, args...);
 ```
 
 The output from the function must be convertible to `Value` in this case.
 
 Or, if the test declaration is visible via non-macro version, you can call it without type erasure:
 ```c++
-auto test1 = unit_test("test 1", [](Context ct, int i) {return MyType{i};);
+auto test1 = lilwil::unit_test("test 1", [](Context ct, int i) {return MyType{i};);
 ...
 MyType t = test1(ct, 6);
 ```
@@ -393,13 +399,13 @@ lib.add_value('number-of-threads', 4)
 
 and retrieve it while running tests in C++:
 ```c++
-int n = get_value("number-of-threads").view_as<int>(); // preferred, n = 4
-int n = call("number-of-threads", my_context).view_as<int>(); // equivalent
+int n = lilwil::get_value("number-of-threads").view_as<int>(); // preferred, n = 4
+int n = lilwil::call("number-of-threads", my_context).view_as<int>(); // equivalent
 ```
 
 #### Adding a Python function as a test
 
-Or sometimes, you might want to make a type-erased function in Python (this should generally only use primitive types).
+Or sometimes, you might want to make a function in Python for later use (this should probably only use primitive types).
 
 ```python
 lib.add_test('times-two', lambda i: i * 2)
@@ -433,7 +439,7 @@ I have found that the discussion of speed for these frameworks is sometimes a li
 
 ### Global suite implementation and thread safety
 
-For interested developers, see `<lilwil/Impl.h>` (not included by tests) for the global suite implementation. It is possible to swap out the given implementation if you have a good reason to do so. What needs to be met is the read_suite / write_suite interface below, which call functors in a thread-safe manner on a STL container like vector. (It really wasn't a concern of mine that test keys be unique, so something like `std::map` is not used.)
+For interested developers, see `<lilwil/Impl.h>` (not included by tests) for the global suite implementation. It is possible to swap out the given implementation if you have a good reason to do so. What needs to be met is the `read_suite` / `write_suite` interface below, which call functors in a thread-safe manner on a STL container like vector. (It really wasn't a concern of mine that test keys be unique, so something like `std::map` is not used.)
 
 Define `LILWIL_CUSTOM_SUITE` to your own header to define your own behavior completely. Otherwise, define `LILWIL_NO_MUTEX` to avoid locking around the test suite, which is in general fine except when modifying global tests or values from *within* a test. `LILWIL_NO_MUTEX` will be assumed if `<shared_mutex>` is unavailable, but a warning will be issued in this case.
 
@@ -547,7 +553,7 @@ cli.exit_main(**kwargs)
 
 ```python
 from multiprocessing.pool import ThreadPool
-ThreadPool(n_threads).imap(tests, run_test) # yay for Python making this easy to use!
+ThreadPool(n_threads).imap(tests, run_test) # yay for this being easy in Python!
 ```
 
 If the number of threads (`--jobs`) is set to 0, no threads are spawned, and everything is run in the main thread. This is a little more lightweight, but signals such as `CTRL-C` (`SIGINT`) will not be caught immediately during execution of a test. This parameter therefore has a default of 1.
