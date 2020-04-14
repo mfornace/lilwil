@@ -8,7 +8,7 @@
 
 # lilwil
 
-`lilwil` is an open-source unit test framework targeting C++17 with Python-based event handlers and logging. Some of the major features of `lilwil` are that it's:
+`lilwil` is an open-source prototyping and unit test framework targeting C++17 with Python-based event handlers and logging. Some of the major features of `lilwil` are that it's:
 
 - **easy to use**: front-end work (argument parsing, etc.) is offloaded to Python as much as possible.
 - **natively parallel**: the built-in runner uses a Python `ThreadPoolExecutor`, and the exposed test API is threadsafe.
@@ -26,9 +26,9 @@ Along with these features are a few costs:
 - `lilwil` needs build-time access to the Python C API headers. It doesn't need to link to Python though, and these headers are not included by your C++ tests.
 - `lilwil` is not header-only, in order to achieve modularity and reduce compile time. See the CMake section for how to incorporate `lilwil` into your project.
 
-I've found that these costs are well worth it, and most of my code for the last few years has used `lilwil` to test and prototype my C++ thesis work.
-
 `lilwil` was inspired by the excellent frameworks `Catch` and `doctest`, which are nice header-only alternatives if the tradeoffs don't make sense for you.
+
+I've found that these costs are well worth it, and most of my code for the last few years has used `lilwil` to test and prototype my C++ thesis work. As such, it is reasonably stable, but please feel free to suggest improvements, features, and interesting use cases that I haven't thought of.
 
 ## Contents
 
