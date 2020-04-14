@@ -180,7 +180,7 @@ I've mostly `lilwil` that you're writing your tests in separate source files fro
 Unit tests are functors which:
 - take a first argument of `lilwil::Context`
 - return `void` or an object convertible to `lilwil::Value`
-- take any other arguments of a type convertible from `lilwil::Value`. (You can use `auto` instead of `lilwil::Context` if it is the only parameter, though it's a bit unrecommended. You can't use `auto` for the other parameters unless you specialize the `lilwil` signature deduction.) Currently default arguments are not supported, though I suppose they could be in the future. 
+- take any other arguments of a type convertible from `lilwil::Value`. (You can use `auto` instead of `lilwil::Context` if it is the only parameter, though it's a bit unrecommended. You can't use `auto` for the other parameters unless you specialize the `lilwil` signature deduction.) Currently default arguments are not supported, though I suppose they could be in the future.
 
 If you include `<lilwil/Macros.h>` you can use the following test declaration styles.
 ```c++
@@ -497,27 +497,33 @@ There are a few other reporters written in the Python package, including writing
 
 Here's the output of `./test.py --help` so you can see some more features:
 ```
-usage: lilwil_test.py [-h] [--list] [--lib PATH] [--jobs INT] [--params STR]
-                      [--regex RE] [--exclude] [--capture] [--gil]
-                      [--xml PATH] [--xml-mode MODE] [--suite NAME]
-                      [--teamcity PATH] [--json PATH] [--json-indent INT]
-                      [--quiet] [--no-default] [--failure] [--success]
-                      [--exception] [--timing] [--skip] [--brief] [--no-color]
-                      [--no-sync] [--out PATH] [--out-mode MODE]
-                      [[...]]
+usage: test.py [-h] [--list] [--lib PATH] [--jobs INT] [--regex RE]
+               [--exclude] [--capture] [--args STR] [--params STR] [--gil]
+               [--xml PATH] [--xml-mode MODE] [--suite NAME] [--teamcity PATH]
+               [--json PATH] [--json-indent INT] [--quiet] [--no-default]
+               [--failure] [--success] [--exception] [--timing] [--skip]
+               [--brief] [--no-color] [--no-sync] [--out PATH]
+               [--out-mode MODE]
+               [[...]]
 
-positional arguments:   test names (if not given, specifies all tests that can
+Run C++ unit tests from Python with the lilwil library
+
+positional arguments:
+                        test names (if not given, specifies all tests that can
                         be run without any user-specified parameters)
 
 optional arguments:
   -h, --help            show this help message and exit
   --list, -l            list all test names
-  --lib PATH, -a PATH   file path for test library (default 'liblilwil_test')
+  --lib PATH, -L PATH   file path for test library (default 'liblilwil')
   --jobs INT, -j INT    # of threads (default 1; 0 to use only main thread)
-  --params STR, -p STR  JSON file path or Python eval-able parameter string
   --regex RE, -r RE     specify tests with names matching a given regex
   --exclude, -x         exclude rather than include specified cases
   --capture, -c         capture std::cerr and std::cout
+  --args STR, -a STR    int or Python tuple expression for a parameter pack to
+                        apply to each test (may be specified multiple times)
+  --params STR, -p STR  JSON file for all parameters (in {"name": [packs...],
+                        ...} form; may be specified multiple times)
   --gil, -g             keep Python global interpeter lock on
 
 reporter options:
@@ -530,7 +536,7 @@ reporter options:
 
 console output options:
   --quiet, -q           prevent command line output (at least from Python)
-  --no-default, -0      do not show event outputs by default
+  --no-default, -0      do not show outputs by default
   --failure, -f         show outputs for failure events (on by default)
   --success, -s         show outputs for success events (off by default)
   --exception, -e       show outputs for exception events (on by default)
