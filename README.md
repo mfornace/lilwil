@@ -55,22 +55,23 @@ I've found that these costs are well worth it, and most of my code for the last 
       - [Storing and retrieving a global value](#storing-and-retrieving-a-global-value)
       - [Adding a Python function as a test](#adding-a-python-function-as-a-test)
     - [Templated functions](#templated-functions)
+    - [Speed and performance](#speed-and-performance)
     - [Global suite implementation and thread safety](#global-suite-implementation-and-thread-safety)
-  - [Customization points](#customization-points)
+  - [Running tests from the command line](#running-tests-from-the-command-line)
+    - [Extending the Python CLI](#extending-the-python-cli)
+    - [Python threads](#python-threads)
+    - [Running a debugger](#running-a-debugger)
+    - [An example](#an-example)
+  - [Other customization points](#other-customization-points)
     - [`lilwil::ToString`](#lilwiltostring)
     - [`lilwil::AddKeyPairs`](#lilwiladdkeypairs)
     - [`lilwil::Glue`](#lilwilglue)
     - [`lilwil::Handler`](#lilwilhandler)
-  - [Running tests from the command line](#running-tests-from-the-command-line)
-    - [Python threads](#python-threads)
-    - [Writing your own script](#writing-your-own-script)
-    - [An example](#an-example)
   - [`liblilwil` Python API](#liblilwil-python-api)
     - [Exposed Python functions via C API](#exposed-python-functions-via-c-api)
     - [Exposed Python C++ API](#exposed-python-c-api)
   - [`lilwil` Python API](#lilwil-python-api)
     - [Info](#info)
-    - [Running a debugger](#running-a-debugger)
     - [Exceptions](#exceptions)
     - [Caller, Context](#caller-context)
   - [Notes](#notes)
@@ -184,6 +185,8 @@ lilwil::unit_test("my-test-name", [](lilwil::Context ct, ...) {...});
 lilwil::unit_test("my-test-name", "my test comment", [](lilwil::Context ct, ...) {...});
 ```
 
+It is not an error to have unit tests share the same name, though it's not an intended use-case. The test suite will behave like a `multi_map` if this is done. (In literal terms though, the suite is implemented like a `vector` of `lilwil::TestCase`.)
+
 ### `lilwil::Context`
 
 `lilwil::Context` is the test runner class. It includes an interface for creating test sections and testing various assertions. `Context` is a derived class of `BaseContext` with no additional members: its sole purpose is to give a decent API for usability. As such, one of the easiest ways to extend `lilwil` is to define your own class inheriting from `Context` with whatever additional methods you want; as long as `Context` is convertible to your class, this will all just work.
@@ -231,6 +234,7 @@ struct lilwil::ToString<T, std::void_t<decltype(std::declval<std::ostream &>() <
     }
 };
 ```
+
 
 #### Test scopes
 
@@ -315,14 +319,22 @@ For floating point types, `Approx` defaults to checking `|l - r| < eps * (scale 
 ### Macros
 
 The following macros are defined with `LILWIL_` prefix if `Macros.h` is included. If not already defined, prefix-less macros are also defined there.
+
 ```c++
-#define GLUE(x) KeyPair(#x, x) // string of the expression and the expression value
-#define HERE file_line(__FILE__, __LINE__) // make a FileLine datum with the current file and line
-#define COMMENT(x) comment(x, HERE) // a comment with file and line information
-#define UNIT_TEST(name, [comment]) ... // a little complicated; see above for usage
+// string of the expression and the expression value
+#define GLUE(x) ::lilwil::KeyPair(#x, x)
+
+// make a FileLine datum with the current file and line
+#define HERE ::lilwil::file_line(__FILE__, __LINE__)
+
+// a comment with file and line information
+#define COMMENT(x) ::lilwil::comment(x, HERE)
+
+// a little complicated; see above for usage
+#define UNIT_TEST(name, [comment]) ...
 ```
 
-Look at `Macros.h` for details, it's pretty simple.
+Look at `Macros.h` for details, it's pretty simple. Feel free to avoid these or define your own macros to fit your own use case.
 
 ### `lilwil::Value`
 
@@ -400,6 +412,15 @@ lilwil::Pack<int, Real, bool>::for_each([&ct](auto t) {
 ```
 This is just using the `Pack` type that `lilwil` uses for signature deduction. For more advanced functionality try something like `boost::hana`.
 
+### Speed and performance
+
+There is some concern in C++ test frameworks that the test asserts and logging be fast, and so this has been a moderate focus in `lilwil`. If an assert fires and something must be logged, `lilwil` will invoke the `Handler`, which probably involves Python execution, so this will be slower than a native C++ approach.
+
+On the other hand, there is no invocation of `Handler`s if logging is unnecessary (for instance, if the assertion is successful and `-s` is not on). Only the event counter must be incremented atomically. Thus we optimize the fast path pretty well. The optional variadic arguments to `ct.require()` are not even processed unless a `Handler` needs to be invoked.
+
+Furthermore, logged arguments are captured as `Value`, which is pretty fast. String formatting is only done, again, if the `Handler` is signaled, which is assumed to not be that often. If you really have a speed issue with the copy into `Value`, a suggested approach is to input the address of your argument instead; this will be put into the SBO of `Value`'s `std::any`. Then customize `ToString` to print your dereferenced pointer, and assuming you haven't caused a segfault via improper lifetimes, you'll have fast logging for your object!
+
+I have found that the discussion of speed for these frameworks is sometimes a little overdone, and to be honest I've never noticed any slowdown of my code due to testing--unless, e.g., I'm being lazy and have an assertion fire for every element of a billion-length container. But if someone raises any performance issue or improvement, I can look into addressing it.
 
 ### Global suite implementation and thread safety
 
@@ -424,8 +445,142 @@ auto read_suite(F &&functor) {return functor(static_cast<Suite const &>(suite())
 
 The threadsafe interface (the default) is like the above, but using a `shared_lock`/`unique_lock` on a `std::shared_timed_mutex`.
 
+## Running tests from the command line
 
-## Customization points
+By default, `lilwil` creates an executable Python script in your build directory. This is done mostly to set some defaults from the CMake configuration. It's almost identical just to running `python -m lilwil.cli` directly. The script is given a `.py` suffix, so it is also importable from your own Python script or interpreter.
+
+There are quite a number of CLI options, which was easy to write using Python's `argparse`. Assuming `test.py` is your script file, here are some example usages.
+
+```bash
+./test.py --help # show help
+./test.py -l # show list of tests
+./test.py  # run all test cases with no supplied parameters. Show failures, exceptions, and timings by default
+./test.py -s # like Catch, show successes too if specified
+./test.py -0e # show no event by default (0), then turn on only exceptions (e)
+./test.py "test-name" # run a given test
+./test.py -r "test-name/.*" # run tests matching a given regex
+./test.py "test-name" -p "[0, 1, 'aaa']" # run a test with parameters specified as a Python string
+```
+
+There are a few other reporters written in the Python package, including writing to JUnit XML, a simple JSON format, and streaming TeamCity directives. In general, command line options which expect an output file path ca take `stderr` and `stdout` as special values which signify that the respective streams should be used.
+
+Here's the output of `./test.py --help` so you can see some more features:
+```
+usage: lilwil_test.py [-h] [--list] [--lib PATH] [--jobs INT] [--params STR]
+                      [--regex RE] [--exclude] [--capture] [--gil]
+                      [--xml PATH] [--xml-mode MODE] [--suite NAME]
+                      [--teamcity PATH] [--json PATH] [--json-indent INT]
+                      [--quiet] [--no-default] [--failure] [--success]
+                      [--exception] [--timing] [--skip] [--brief] [--no-color]
+                      [--no-sync] [--out PATH] [--out-mode MODE]
+                      [[...]]
+
+positional arguments:   test names (if not given, specifies all tests that can
+                        be run without any user-specified parameters)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --list, -l            list all test names
+  --lib PATH, -a PATH   file path for test library (default 'liblilwil_test')
+  --jobs INT, -j INT    # of threads (default 1; 0 to use only main thread)
+  --params STR, -p STR  JSON file path or Python eval-able parameter string
+  --regex RE, -r RE     specify tests with names matching a given regex
+  --exclude, -x         exclude rather than include specified cases
+  --capture, -c         capture std::cerr and std::cout
+  --gil, -g             keep Python global interpeter lock on
+
+reporter options:
+  --xml PATH            XML file path
+  --xml-mode MODE       XML file open mode (default 'a+b')
+  --suite NAME          test suite output name (default 'lilwil')
+  --teamcity PATH       TeamCity file path
+  --json PATH           JSON file path
+  --json-indent INT     JSON indentation (default None)
+
+console output options:
+  --quiet, -q           prevent command line output (at least from Python)
+  --no-default, -0      do not show event outputs by default
+  --failure, -f         show outputs for failure events (on by default)
+  --success, -s         show outputs for success events (off by default)
+  --exception, -e       show outputs for exception events (on by default)
+  --timing, -t          show outputs for timing events (on by default)
+  --skip, -k            show skipped tests (on by default)
+  --brief, -b           abbreviate output (e.g. skip ___ lines)
+  --no-color, -n        do not use ASCI colors in command line output
+  --no-sync, -y         show console output asynchronously
+  --out PATH, -o PATH   output file path (default 'stdout')
+  --out-mode MODE       output file open mode (default 'w')
+```
+
+### Extending the Python CLI
+
+It is easy to write your own executable Python script building on the one `lilwil` made. For example, let's write a test script that lets C++ tests reference a value `max_time`.
+
+```python
+#!/usr/bin/env python3
+from lilwil import cli
+
+parser = cli.parser(lib='my_lib_name') # redefine the default library name away from 'liblilwil'
+parser.add_argument('--time', type=float, default=60, help='max test time in seconds')
+
+kwargs = vars(parser.parse_args())
+
+lib = cli.import_library(kwargs['lib'])
+lib.add_value('max_time', kwargs.pop('time'))
+
+# remember to pop any added arguments before passing to cli.main
+cli.exit_main(**kwargs)
+```
+
+### Python threads
+
+`lilwil.cli` exposes a command line option for you to specify the number of threads used. The threads are applied simply via something like:
+
+```python
+from multiprocessing.pool import ThreadPool
+ThreadPool(n_threads).imap(tests, run_test) # yay for Python making this easy to use!
+```
+
+If the number of threads (`--jobs`) is set to 0, no threads are spawned, and everything is run in the main thread. This is a little more lightweight, but signals such as `CTRL-C` (`SIGINT`) will not be caught immediately during execution of a test. This parameter therefore has a default of 1.
+
+Also, `lilwil` turns off the Python GIL by default when running tests, but if you need to, you can keep it on (with `--gil`). The GIL is re-acquired by the Python handlers as necessary.
+
+### Running a debugger
+`lilwil` current doesn't expose a `break_into_debugger()`, mostly because I've never used it. It could probably be added in the future.
+
+To debug a test using `lldb` or `gdb`, the only wrinkle seems to be that the python executable should be explicitly listed:
+
+```bash
+lldb -- python3 ./test.py -s "mytest" # ... and other arguments
+gdb --args python3 ./test.py -s "mytest" # ... and other arguments
+```
+
+I don't use `gdb`, so let me know if you encounter issues with that `gdb` line.
+
+### An example
+
+There is a lot of programmability within your own code for running tests in different styles. Let's use the `Value` registered above to write a helper to repeat a test until the allowed test time is used up.
+
+```c++
+template <class F>
+void repeat_test(Context const &ct, F const &test) {
+    double max = ct.start_time + std::chrono::duration<Real>(get_value("max_time").view_as<double>());
+    while (Clock::now() < max) test();
+}
+```
+
+Then we can write a repetitive test which short-circuits like so:
+
+```c++
+UNIT_TEST("my-test") = [](Context ct) {
+    repeat_test(ct, [&] {run_some_random_test(ct);});
+};
+```
+
+You could define further extensions could run these iterations in parallel. Functionality like `repeat_test` is intentionally left out of the API so that users can define their own behavior.
+
+
+## Other customization points
 
 There are a few customization points in the C++ API which are implemented via struct template specialization.
 
@@ -500,80 +655,6 @@ Since it's so commonly used, `lilwil` tracks the number of times each `Event` is
 std::ptrdiff_t n_fail = ct.count(Failure); // const, noexcept; gives -1 if the event type is out of range
 ```
 
-## Running tests from the command line
-
-CHANGE
-```bash
-python -m lilwil.cli -a mylib # run all tests from mylib.so/mylib.dll/mylib.dylib
-```
-
-By default, events are only counted and not logged. To see more output use:
-
-```bash
-python -m lilwil.cli -a mylib -fe # log information on failures, exceptions, skips
-python -m lilwil.cli -a mylib -fsetk # log information on failures, successes, exceptions, timings, skips
-```
-
-There are a few other reporters written in the Python package, including writing to JUnit XML, a simple JSON format, and streaming TeamCity directives.
-
-In general, command line options which expect an output file path ca take `stderr` and `stdout` as special values which signify that the respective streams should be used.
-
-See the command line help `python -m lilwil.cli --help` for other options.
-
-### Python threads
-
-`lilwil.cli` exposes a command line option for you to specify the number of threads used. The threads are used simply via something like:
-
-```python
-from multiprocessing.pool import ThreadPool
-ThreadPool(n_threads).imap(tests, run_test)
-```
-
-If the number of threads (`--jobs`) is set to 0, no threads are spawned, and everything is run in the main thread. This is a little more lightweight, but signals such as `CTRL-C` (`SIGINT`) will not be caught immediately during execution of a test. This parameter therefore has a default of 1.
-
-Also, `lilwil` turns off the Python GIL by default when running tests, but if you need to, you can keep it on (with `--gil`). The GIL is re-acquired by the Python handlers as necessary.
-
-### Writing your own script
-
-It is easy to write your own executable Python script to wrap the one provided. For example, let's write a test script that lets C++ tests reference a value `max_time`.
-
-```python
-#!/usr/bin/env python3
-from lilwil import cli
-
-parser = cli.parser(lib='my_lib_name') # redefine the default library name away from 'liblilwil'
-parser.add_argument('--time', type=float, default=60, help='max test time in seconds')
-
-kwargs = vars(parser.parse_args())
-
-lib = cli.import_library(kwargs['lib'])
-lib.add_value('max_time', kwargs.pop('time'))
-
-# remember to pop any added arguments before passing to cli.main
-cli.main(**kwargs)
-```
-
-### An example
-
-There is a lot of programmability within your own code for running tests in different styles. Let's use the `Value` registered above to write a helper to repeat a test until the allowed test time is used up.
-
-```c++
-template <class F>
-void repeat_test(Context const &ct, F const &test) {
-    double max = ct.start_time + std::chrono::duration<Real>(get_value("max_time").view_as<double>());
-    while (Clock::now() < max) test();
-}
-```
-
-Then we can write a repetitive test which short-circuits like so:
-
-```c++
-UNIT_TEST("my-test") = [](Context ct) {
-    repeat_test(ct, [&] {run_some_random_test(ct);});
-};
-```
-
-You could define further extensions could run these iterations in parallel. Functionality like `repeat_test` is intentionally left out of the API so that users can define their own behavior.
 
 ## `liblilwil` Python API
 
@@ -649,21 +730,6 @@ ct.info({1, 2}); // single key pair (allow?)
 ct(1, 2); // two key pairs with blank keys
 ct(KeyPair(1, 2), KeyPair(3, 4)); // two key pairs
 ct({1, 2}, {3, 4}); // two key pairs
-```
-
-### Running a debugger
-`lilwil` current doesn't expose a `break_into_debugger()`, mostly because I've never used it. It could probably be added in the future.
-
-To debug a test using `lldb` or `gdb`, the only wrinkle seems to be that the python executable should be explicitly listed:
-
-```bash
-lldb -- python3 ./test.py -s "mytest" # ... and other arguments
-```
-
-I don't use gdb, but I assume it would be done analogously:
-
-```bash
-gdb --args python3 ./test.py -s "mytest" # ... and other arguments
 ```
 
 <!--
