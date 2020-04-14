@@ -152,6 +152,13 @@ Run CMake with `-DLILWIL_PYTHON={my python executable}` to customize. CMake's `f
 
 ## Writing tests in C++
 
+`lilwil` is focused on being customizable and tries not to assume much about your desired behavior. As such, I think a good way to start using `lilwil` in a big project is to write your own header file, e.g. `Test.h`, which:
+
+- includes the `<lilwil/Test.h>` and `<lilwil/Macros.h>`, if you want it
+- makes any `using` statements (e.g. `using lilwil::Context`)
+- defines default printing behavior (see BLANK)
+- defines any other general-purpose functions, macros, or customizations you might want
+
 ### Unit test declaration
 Unit tests are functors which:
 - take a first argument of `lilwil::Context`
@@ -174,11 +181,13 @@ lilwil::unit_test("my-test-name", [](lilwil::Context ct, ...) {...});
 lilwil::unit_test("my-test-name", "my test comment", [](lilwil::Context ct, ...) {...});
 ```
 
-### `Context` API
+### `lilwil::Context`
 
-Most methods on `Context` are non-const. However, `Context` is fine to be copied or moved around, so it has approximately the same thread safety as `std::vector` and other STL containers (i.e. multiple readers are fine, reading and writing at the same time is bad). A default-constructed `Context` is valid but not very useful; you shouldn't construct it yourself unless you know what you're doing.
+`lilwil::Context` is the test runner class. It includes an interface for creating test sections and testing various assertions. `Context` is a derived class of `BaseContext` with no additional members: its sole purpose is to give a decent API for usability. As such, one of the easiest ways to extend `lilwil` is to define your own class inheriting from `Context` with whatever additional methods you want; as long as `Context` is convertible to your class, this will all just work.
 
-To run things in parallel within C++, just make multiple copies of your `Context` as needed. However, the registered handlers must be thread safe when called concurrently for this to work. (The included Python handlers are thread safe.)
+Most methods on `Context` are non-const. However, `Context` is fine to be copied or moved around, so it has approximately the same thread safety as usual STL containers (i.e. multiple readers are fine, reading and writing at the same time is bad). (A default-constructed `Context` is valid but not very useful; you shouldn't construct it yourself unless you know what you're doing.)
+
+To run things in parallel within a C++ test, just make multiple copies of your `Context` as needed. This assumes that the registered handlers are thread safe when called concurrently; all of the included Python handlers are thread safe.
 
 #### Logging
 
@@ -205,7 +214,7 @@ bool ok = ct(HERE).require(...);
 
 It's generally a focus of `lilwil` to make macros small and limited. Whereas a use of `CHECK(...)` might capture the file and line number implicitly in `Catch`, in `lilwil` to get the same thing you need `ct(HERE).require(...)`. See [Macros](#macros) for the (short) list of available macros from `lilwil`.
 
-The intent is generally to yield more transparent C++ code in this regard. However, you're free to define your own macros if you want.
+The intent is generally to yield more transparent C++ code in this regard. However, you're free to define your own macros if you want to shorten your typing more.
 
 Except for primitive values that are builtins in python, the default print behavior in `lilwil` is just to print the `typeid` name of the given object. You will probably want to customize this behavior yourself. To enable `std::ostream` style print, include the following snippet in the global namespace. `ToString` should return something that can be cast to `std::string`.
 
@@ -363,7 +372,7 @@ A more complicated example is `ComparisonGlue`, which logs the left hand side, r
 
 #### C++ type-erased function
 
-The standard test takes any type of functor and converts it into (more or less) `std::function<Value(Context, ArgPack)>`.
+The standard test takes any type of functor and converts it into (more or less) `std::function<Value(Context, std::vector<Value>)>`.
 
 If a C++ exception occurs while running this type of test, the runner generally reports and catches it. However, handlers may throw instances of `ClientError` (subclass of `std::exception`), which are not caught.
 
@@ -397,7 +406,7 @@ int n = call("number-of-threads", my_context).view_as<int>(); // equivalent
 
 #### Python function
 
-Or sometimes, you might want to make a type-erased handler to Python.
+Or sometimes, you might want to make a type-erased function in Python (this should generally only use primitive types).
 
 ```python
 lib.add_test('times-two', lambda i: i * 2)
@@ -410,7 +419,7 @@ int n = call("times-two", 5).view_as<int>(); // n = 10
 
 ### Templated functions
 
-You can test different types via the following within a test case
+You might find it useful test different types via the following within a test case
 ```c++
 lilwil::Pack<int, Real, bool>::for_each([&ct](auto t) {
     using type = decltype(*t);
@@ -473,7 +482,7 @@ cli.main(**kwargs)
 
 ### An example
 
-Let's use the `Value` registered above to write a helper to repeat a test until the allowed test time is used up.
+There is a lot of programmability within your own code for running tests in different styles. Let's use the `Value` registered above to write a helper to repeat a test until the allowed test time is used up.
 ```c++
 template <class F>
 void repeat_test(Context const &ct, F const &test) {
@@ -487,7 +496,7 @@ UNIT_TEST("my-test") = [](Context ct) {
     repeat_test(ct, [&] {run_some_random_test(ct);});
 };
 ```
-You could define further extensions could run the test iterations in parallel. Functionality like `repeat_test` is intentionally left out of the API so that users can define their own behavior.
+You could define further extensions could run these iterations in parallel. Functionality like `repeat_test` is intentionally left out of the API so that users can define their own behavior.
 
 ## `Handler` C++ API
 Events are kept track of via a simple integer `enum`. It is relatively easy to extend to more event types.
@@ -495,7 +504,7 @@ Events are kept track of via a simple integer `enum`. It is relatively easy to e
 A handler is registered to be called if a single fixed `Event` is signaled. It is implemented as a `std::function`. If no handler is registered for a given event, nothing is called.
 
 ```c++
-enum Event : std::uint_fast32_t {Failure=0, Success=1, Exception=2, Timing=3, Skipped=4};
+enum Event : std::uint_fast32_t {Failure=0, Success=1, Exception=2, Timing=3, Skipped=4}; // roughly
 using Handler = std::function<bool(Event, Scopes const &, Logs &&)>;
 ```
 
@@ -509,7 +518,7 @@ std::ptrdiff_t n_fail = ct.count(Failure); // const, noexcept; gives -1 if the e
 
 ## `liblilwil` Python API
 
-`liblilwil` refers to the Python extension module being compiled. The `liblilwil` Python handlers all use the official CPython API. Doing so is not too hard beyond managing `PyObject *` lifetimes.
+`liblilwil` refers to the Python extension module being compiled. The `liblilwil` Python handlers all use the official CPython API. Doing so was not too hard beyond managing `PyObject *` lifetimes.
 
 ### Exposed Python functions via C API
 
@@ -598,9 +607,7 @@ I don't use gdb, but I assume it would be done analogously:
 gdb --args python3 ./test.py -s "mytest" # ... and other arguments
 ```
 
-<!--
 ## Done
-
 ### Breaking out of tests early
 At the very least put `start_time` into Context.
 Problem with giving the short circuit API is partially that it can be ignored in a test.
@@ -608,14 +615,10 @@ It is fully possible to truncate the test once `start_time` is inside, or any ot
 Possibly `start_time` should be given to handler, or `start_time` and `current_time`.
 Standardize what handler return value means, add skip event if needed.
 
-
-### CMake
-User needs to give shared library target for now so that exports all occur
-
 ### Object size
 - Can explicitly instantiate `Context` copy constructors etc.
 - Write own version of `std::function` (maybe)
-
+ 
 ### Library/module name
 One option is leave as is. The library is built in whatever file, always named liblilwil.
 This is only usable if Python > 3.4 and specify -a file_name.
