@@ -107,10 +107,9 @@ UNIT_TEST("add-get-value") = [](lilwil::Context ct) {
 };
 
 
-auto test2 = lilwil::unit_test("skipped-test/with-parameters", COMMENT(), [](lilwil::Context ct, goo const &, int a, std::string b) {
+auto test2 = lilwil::unit_test("test/with-parameters", COMMENT(), [](lilwil::Context ct, goo const &, int a, std::string b) {
     // return goo();
     ct(HERE).equal(5, 5);
-    throw lilwil::Skip("this test is skipped");
 }, {{goo(), 1, "ok"}, {goo(), 3, "ok2"}});
 
 

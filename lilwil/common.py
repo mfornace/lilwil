@@ -1,4 +1,5 @@
-import os, sys, io, enum, typing, importlib
+import os, json, sys, io, enum, typing, importlib
+from collections import defaultdict
 
 try:
     from contextlib import ExitStack
@@ -101,47 +102,6 @@ def open_file(stack, name, mode):
 
 ################################################################################
 
-# Modify this global list as needed
-EVAL_MODULES = ['csv', 'json', 'os', 'numpy', 'pandas']
-
-def nice_eval(string, modules=None):
-    '''
-    Run eval() on a user's specified string
-    For convenience, give them access to the whitelisted modules
-    '''
-
-    mods = {}
-    for m in EVAL_MODULES if modules is None else modules:
-        if m not in string:
-            continue
-        try:
-            mods[m] = importlib.import_module(m)
-        except ImportError:
-            pass
-
-    return eval(string, mods)
-
-
-def load_parameters(params):
-    ''' load parameters from one of:
-    - None
-    - dict-like
-    - JSON file name
-    - eval-able str
-    '''
-    if not params:
-        return {}
-    elif not isinstance(params, str):
-        return dict(params)
-    try:
-        with open(params) as f:
-            import json
-            return dict(json.load(f))
-    except FileError:
-        return nice_eval(params)
-
-################################################################################
-
 def test_indices(names, exclude=False, tests=None, regex='', strict=False):
     '''
     Return list of indices of tests to run
@@ -168,31 +128,70 @@ def test_indices(names, exclude=False, tests=None, regex='', strict=False):
         out = set(range(len(names))).difference(out)
     return sorted(out)
 
+
 ################################################################################
 
-def parametrized_indices(lib, indices, params=(None,), default=(None,)):
+# Modify this global list as needed
+EVAL_MODULES = ['csv', 'json', 'os', 'numpy', 'pandas']
+
+def nice_eval(string, modules=None):
     '''
-    Yield tuple of (index, parameter_pack) for each test to run
+    Run eval() on a user's specified string
+    For convenience, give them access to the whitelisted modules
+    '''
+    if not isinstance(string, str):
+        return string
+
+    mods = {}
+    for m in EVAL_MODULES if modules is None else modules:
+        if m not in string:
+            continue
+        try:
+            mods[m] = importlib.import_module(m)
+        except ImportError:
+            pass
+
+    return eval(string, mods)
+
+def load_parameters(args, params):
+    ''' load parameters from one of:
+    - None
+    - dict-like
+    - JSON file name
+    - eval-able str
+    '''
+    args = tuple(nice_eval(p) for p in args or ())
+    out = defaultdict(lambda: args)
+    for p in params or ():
+        with open(p) as f:
+            out.update(json.load(f))
+    return out
+
+################################################################################
+
+def parametrized_indices(lib, indices, params=(None,)):
+    '''
+    Yield tuple of (index, parameter_pack) for each test/parameter combination to run
     - lib: the lilwil library object
     - indices: the possible indices to yield from
     - params: dict or list of specified parameters (e.g. from load_parameters())
-    If params is not dict-like, it is assumed to either:
-    - give the default parameters for all tests (e.g. [] or [1,2,3]).
-    - give the lists of default parameters for all tests (e.g. [[], [1]]).
-    A valid argument list is either:
+
+    If params is dict-like, it should map from test name to a list of parameter packs
+
+    If params is list-like, it is assumed to be the list of parameter packs for all tests
+
+    A parameter pack is either
     - a tuple of arguments
-    - an index to preregistered arguments
+    - an index to a preregistered argument pack
     - None, meaning all preregistered arguments
     '''
     names = lib.test_names()
-    if not hasattr(params, 'get'):
-        try:
-            assert isinstance(params[0], (list, tuple, dict))
-        except (TypeError, IndexError, AssertionError):
-            params = [params]
-        params, default = {}, params
     for i in indices:
-        ps = list(params.get(names[i], default))
+        try:
+            ps = list(params[names[i]])
+        except KeyError:
+            continue
+
         n = lib.n_parameters(i)
 
         # replace None with all of the prespecified indices
@@ -206,9 +205,9 @@ def parametrized_indices(lib, indices, params=(None,), default=(None,)):
 
         # yield each parameter pack for this test
         for p in ps:
-            if isinstance(p, int) and p >= n:
-                raise IndexError("Parameter pack index {} is out of range for test '{}' (n={})".format(p, names[i], n))
-            yield i, p
+            if not isinstance(p, int) or p < n:
+                # raise IndexError("Parameter pack index {} is out of range for test '{}' (n={})".format(p, names[i], n))
+                yield i, p
 
 ################################################################################
 
