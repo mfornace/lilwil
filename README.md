@@ -173,7 +173,10 @@ You can run CMake with `-DLILWIL_PYTHON={my python executable}` to customize the
 - defines default printing behavior (see [`lilwil::ToString`](#lilwiltostring))
 - defines any other general-purpose functions, macros, or customizations you might want
 
+`lilwil` mostly assumes that you're writing your tests in source files in a separate test directory than your main project code. This is likely the case for any reasonably sized project. So I haven't devoted any effort to letting you write your tests inline alongside your production code, and I would not advise it.
+
 ### Unit test declaration
+
 Unit tests are functors which:
 - take a first argument of `lilwil::Context`
 - return `void` or an object convertible to `lilwil::Value`
@@ -195,7 +198,7 @@ lilwil::unit_test("my-test-name", [](lilwil::Context ct, ...) {...});
 lilwil::unit_test("my-test-name", "my test comment", [](lilwil::Context ct, ...) {...});
 ```
 
-It is not an error to have unit tests share the same name, though it's not an intended use-case. The test suite will behave like a `multi_map` if this is done. (In literal terms though, the suite is implemented like a `vector` of `lilwil::TestCase`.)
+It is not an error to have unit tests share the same name, though it's not an intended use-case. The test suite will behave like a `multi_map` if this is done. (In literal terms though, the suite is just implemented like a `vector` of `lilwil::TestCase`.)
 
 ### `lilwil::Context`
 
