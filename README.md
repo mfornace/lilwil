@@ -108,7 +108,7 @@ Now ran via
 ./lilwil_test.py -s mytest/check-something
 ```
 
-Gives this output:
+Gives this output (coloring is used when available):
 ```
 Test 0 'mytest/check-something' (test/Test.cc:170)
 
@@ -729,7 +729,7 @@ Look in the code for more detail.
 
 ## `lilwil` Python API
 
-In the future I will document more about the Python API in case you want to use `lilwil` more as a Python library.
+In the future I will document more about the Python API in case you want to use `lilwil` more as a Python library. For now just look at the code and docstrings.
 
 <!-- ### Info
 Finalize `info` API. Just made it return self. Accept variadic arguments? Initializer list?
