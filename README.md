@@ -160,7 +160,7 @@ Run CMake with `-DLILWIL_PYTHON={my python executable}` to customize. CMake's `f
 
 - includes the `<lilwil/Test.h>` and `<lilwil/Macros.h>`, if you want it
 - makes any `using` statements (e.g. `using lilwil::Context`)
-- defines default printing behavior (see BLANK)
+- defines default printing behavior (see [`lilwil::ToString`](#lilwiltostring))
 - defines any other general-purpose functions, macros, or customizations you might want
 
 ### Unit test declaration
@@ -590,6 +590,19 @@ There are a few customization points in the C++ API which are implemented via st
 template <class T, class SFINAE=void>
 struct ToString {
     String operator()(T const &t) const; // Prototype, define your own behavior like this
+};
+```
+
+In case you missed it, here's a snippet you can include to allow `std::ostream`-based formatting:
+
+```c++
+template <class T>
+struct lilwil::ToString<T, std::void_t<decltype(std::declval<std::ostream &>() << std::declval<T const &>())>> {
+    std::string operator()(T const &t) const {
+        std::ostringstream os;
+        os << t;
+        return os.str();
+    }
 };
 ```
 
