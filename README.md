@@ -28,7 +28,7 @@ Along with these features are a few costs:
 
 `lilwil` was inspired by the excellent frameworks `Catch` and `doctest`, which are nice header-only alternatives if the tradeoffs don't make sense for you.
 
-I've found that these costs are well worth it, and most of my code for the last few years has used `lilwil` to test and prototype my C++ thesis work. As such, it is fairly stable, but please feel free to contribute (or suggest) improvements, features, and interesting use cases that I haven't thought of.
+I've found that these costs are well worth it, and most of my code for the last few years has used `lilwil` to test and prototype my C++ thesis work. As such, it is fairly stable, but please feel free to contribute (or suggest) improvements, features, and interesting use cases that I haven't thought of!
 
 ## Contents
 
@@ -72,12 +72,6 @@ I've found that these costs are well worth it, and most of my code for the last 
     - [Exposed Python functions via C API](#exposed-python-functions-via-c-api)
     - [Exposed Python C++ API](#exposed-python-c-api)
   - [`lilwil` Python API](#lilwil-python-api)
-  - [Done](#done)
-    - [Breaking out of tests early](#breaking-out-of-tests-early)
-    - [Object size](#object-size)
-    - [Library/module name](#librarymodule-name)
-    - [FileLine](#fileline)
-    - [Caller, Context](#caller-context)
   - [Random notes](#random-notes)
 
 ## Simple usage
