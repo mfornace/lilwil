@@ -108,7 +108,7 @@ Now ran via
 ./lilwil_test.py -s mytest/check-something
 ```
 
-Gives this output:
+Gives this output (coloring is used when available):
 ```
 Test 0 'mytest/check-something' (test/Test.cc:170)
 
