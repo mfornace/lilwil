@@ -27,7 +27,6 @@ if __name__ == '__main__':
 
     # Examples to add your own custom arguments
     # parser.add_argument('--time', type=float, default=float('inf'), help='maximum test time')
-    # parser.add_argument('--verbose', type=int, default=0, help='print stuff during tests')
 
     # Parse command line arguments
     args = vars(parser.parse_args())
@@ -37,7 +36,6 @@ if __name__ == '__main__':
 
     # Examples to apply your own arguments to the test suite
     # lib.add_value('max_time', args.pop('time'))
-    # lib.add_value('verbose', args.pop('verbose'))
 
     # Call the underlying implementation and exit (use cli.main to run but not exit)
     cli.exit_main(**args)
