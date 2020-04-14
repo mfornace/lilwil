@@ -1,4 +1,4 @@
-```  _ _ _          _ _ 
+```  _ _ _          _ _
  | (_) |        (_) |
  | |_| |_      ___| |
  | | | \ \ /\ / / | |
@@ -80,23 +80,53 @@ I've found that these costs are well worth it, and most of my code for the last 
 
 UNIT_TEST("mytest/check-something") = [](lilwil::Context ct) {
     // log a single key pair of information before an assertion.
-    ct.info("value", 1.5);
+    ct.info("my-value", 1.5);
 
-    ct("a message", "another message", 10.5, ...); // log some messages
+    // log some messages
+    ct("a message", "another message", 10.5, ...);
 
-    ct(HERE); // log source file location.
+    // Use a macro shortcut for ct.info("5 + 5", 10);
+    ct(GLUE(5 + 5));
 
-    ct(GLUE(5 + 5)); // same as ct.info("5 + 5", 10);
+    // Use a macro to log source file location
+    ct(HERE);
 
-    bool ok = ct(HERE).require(1 < 2, "should be true"); // chain statements together if convenient
+    // Assert equality (see Context API for more asserts.)
+    ct.equal(5, 5, "these values should be equal");
 
-    // A variety of obvious wrappers for require are included. See Context API for more details.
-    ct(HERE).equal(5, 5);
-    ct(HERE).less(4, 5);
+    // Most Context methods can be chained
+    bool ok = ct(HERE).require(2 < 1, "should be less");
 };
 ```
 
-A little more advanced functionality:
+Now ran via
+```bash
+./lilwil_test.py -s mytest/check-something
+```
+
+Gives this output:
+```
+Test 0 'mytest/check-something' (test/Test.cc:170)
+
+Failure: 'mytest/check-something' (test/Test.cc:176)
+    my-value: 1.5
+    info: a message
+    info: another message
+    info: 10.5
+    5 + 5: 10
+    info: should be true
+    value: False
+
+Success: 'mytest/check-something' (test/Test.cc:183)
+    required: 5 == 5
+    value: True
+
+Success: 'mytest/check-something' (test/Test.cc:184)
+    required: 4 < 5
+    value: True
+
+Results: {Failure: 1, Success: 2}
+```
 
 ## Install
 

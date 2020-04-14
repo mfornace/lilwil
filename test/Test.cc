@@ -167,4 +167,19 @@ UNIT_TEST("test-5") = [](auto ct) {
     ct(HERE).all("<", std::less<>(), std::vector<int>{1,2,3}, std::vector<int>{2,5,4});
 };
 
+UNIT_TEST("mytest/check-something") = [](lilwil::Context ct) {
+    // log a single key pair of information before an assertion.
+    ct.info("value", 1.5);
+
+    ct("a message", "another message", 10.5); // log some messages
+
+    ct(GLUE(5 + 5)); // same as ct.info("5 + 5", 10);
+
+    bool ok = ct(HERE).require(2 < 1, "should be true"); // log source file and chain statements together if convenient
+
+    // A variety of obvious wrappers for require are included. See Context API for more details.
+    ct(HERE).equal(5, 5);
+    ct(HERE).less(4, 5);
+};
+
 /******************************************************************************/
