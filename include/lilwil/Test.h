@@ -8,11 +8,9 @@ using packs::Signature;
 
 /******************************************************************************/
 
-/// No need to inherit from std::exception since the use case is so limited, I think.
-struct Skip {
-    std::string_view message;
-    Skip() noexcept : message("Test skipped") {}
-    explicit Skip(std::string_view const &m) noexcept : message(m) {}
+struct Skip : std::runtime_error {
+    using std::runtime_error::runtime_error;
+    Skip() : std::runtime_error("Test skipped") {}
 };
 
 /******************************************************************************/
@@ -63,18 +61,18 @@ struct TestAdapter {
     Value operator()(Context &ct, ArgPack args) {
         try {
             if (args.size() != Sig::size)
-                throw std::runtime_error(wrong_number_string(Sig::size, args.size()));
+                throw Skip(wrong_number_string(Sig::size, args.size()));
             return Sig::indexed([&](auto ...ts) {
                 return value_invoke(function, ct, cast_index(args, ts)...);
             });
         } catch (Skip const &e) {
-            ct.info("value", e.message);
+            ct.info("reason", e.what());
             ct.handle(Skipped);
             throw;
         } catch (ClientError const &) {
             throw;
         } catch (std::exception const &e) {
-            ct.info("value", e.what());
+            ct.info("reason", e.what());
             ct.handle(Exception);
             throw;
         } catch (...) {
@@ -94,20 +92,20 @@ struct ValueAdapter {
 
 /******************************************************************************/
 
-struct TestCaseComment {
+struct TestComment {
     std::string comment;
     FileLine location;
-    TestCaseComment() = default;
+    TestComment() = default;
 
     template <class T>
-    TestCaseComment(Comment<T> c)
+    TestComment(Comment<T> c)
         : comment(std::move(c.comment)), location(std::move(c.location)) {}
 };
 
 /// A named, commented, possibly parametrized unit test case
 struct TestCase {
     std::string name;
-    TestCaseComment comment;
+    TestComment comment;
     std::function<Value(Context &, ArgPack)> function;
     Vector<ArgPack> parameters;
 };
@@ -116,13 +114,13 @@ struct TestCase {
 void add_test(TestCase t);
 
 template <class F>
-void add_raw_test(std::string &&name, TestCaseComment &&c, F const &f, Vector<ArgPack> &&v) {
-    if (TestSignature<F>::size <= 2 && v.empty()) v.emplace_back();
+void add_raw_test(std::string &&name, TestComment &&c, F const &f, Vector<ArgPack> &&v) {
+    // if (TestSignature<F>::size <= 2 && v.empty()) v.emplace_back();
     add_test(TestCase{std::move(name), std::move(c), TestAdapter<F>{f}, std::move(v)});
 }
 
 template <class F>
-void add_test(std::string name, TestCaseComment c, F const &f, Vector<ArgPack> v={}) {
+void add_test(std::string name, TestComment c, F const &f, Vector<ArgPack> v={}) {
     return add_raw_test(std::move(name), std::move(c), packs::SimplifyFunction<F>()(f), std::move(v));
 }
 
@@ -136,12 +134,12 @@ struct UnitTest {
 
 template <class F>
 UnitTest<F> unit_test(std::string name, F const &f, Vector<ArgPack> v={}) {
-    add_test(name, TestCaseComment(), f, std::move(v));
+    add_test(name, TestComment(), f, std::move(v));
     return {std::move(name), f};
 }
 
 template <class F>
-UnitTest<F> unit_test(std::string name, TestCaseComment comment, F const &f, Vector<ArgPack> v={}) {
+UnitTest<F> unit_test(std::string name, TestComment comment, F const &f, Vector<ArgPack> v={}) {
     add_test(name, std::move(comment), f, std::move(v));
     return {std::move(name), f};
 }
@@ -150,7 +148,7 @@ UnitTest<F> unit_test(std::string name, TestCaseComment comment, F const &f, Vec
 
 /// Same as unit_test() but just returns a meaningless bool instead of a functor object
 template <class F>
-bool anonymous_test(std::string name, TestCaseComment comment, F &&function, Vector<ArgPack> v={}) {
+bool anonymous_test(std::string name, TestComment comment, F &&function, Vector<ArgPack> v={}) {
     add_test(std::move(name), std::move(comment), static_cast<F &&>(function), std::move(v));
     return bool();
 }
@@ -158,9 +156,9 @@ bool anonymous_test(std::string name, TestCaseComment comment, F &&function, Vec
 /// Helper class for UNIT_TEST() macro, overloads the = operator to make it a bit prettier.
 struct AnonymousClosure {
     std::string name;
-    TestCaseComment comment;
+    TestComment comment;
 
-    AnonymousClosure(std::string s, TestCaseComment c)
+    AnonymousClosure(std::string s, TestComment c)
         : name(std::move(s)), comment(std::move(c)) {}
 
     template <class F>

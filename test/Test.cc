@@ -72,7 +72,7 @@ auto test1 = unit_test("general-usage", COMMENT("This is a test"), [](lilwil::Co
     std::cerr << "Hey I am std::cerr 1" << std::endl;
     std::cout << "Hey I am std::cout 1" << std::endl;
 
-    ct.timed(1, []{return 1;});
+    int one = ct.timed([]{return 1;});
 
     ct(HERE).near(5, 5.0);
 
@@ -107,11 +107,12 @@ UNIT_TEST("add-get-value") = [](lilwil::Context ct) {
 };
 
 
-UNIT_TEST("skipped-test/with-parameters") = [](lilwil::Context ct, goo const &) {
+auto test2 = lilwil::unit_test("skipped-test/with-parameters", COMMENT(), [](lilwil::Context ct, goo const &, int a, std::string b) {
     // return goo();
     ct(HERE).equal(5, 5);
     throw lilwil::Skip("this test is skipped");
-};
+}, {{goo(), 1, "ok"}, {goo(), 3, "ok2"}});
+
 
 UNIT_TEST("skipped-test/no-parameters") = [](lilwil::Context ct) {
     // return goo();
@@ -123,8 +124,8 @@ UNIT_TEST("skipped-test/no-parameters") = [](lilwil::Context ct) {
 std::shared_timed_mutex mut;
 
 UNIT_TEST("shared_timed_mutex/timing") = [](auto ct) {
-    ct(HERE, "unique_lock").timed(1000, [&]{std::unique_lock<std::shared_timed_mutex> lock(mut);});
-    ct(HERE, "shared_lock").timed(1000, [&]{std::shared_lock<std::shared_timed_mutex> lock(mut);});
+    ct(HERE, "unique_lock").timing(1000, [&]{std::unique_lock<std::shared_timed_mutex> lock(mut);});
+    ct(HERE, "shared_lock").timing(1000, [&]{std::shared_lock<std::shared_timed_mutex> lock(mut);});
 };
 
 UNIT_TEST("pipeline/1") = [](auto ct) -> std::tuple<std::string_view, double, bool, goo> {

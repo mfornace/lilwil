@@ -114,6 +114,16 @@ struct ViewAs<std::string_view, SFINAE> {
     }
 };
 
+// string to string_view. SFINAE in case user has a different desired behavior
+template <class SFINAE>
+struct ViewAs<String, SFINAE> {
+    String operator()(Value const &a) const {
+        if (auto p = a.target<std::string_view>()) return String(*p);
+        if (auto p = a.target<char const *>()) return String(*p);
+        throw a.no_conversion(typeid(String));
+    }
+};
+
 /******************************************************************************/
 
 String address_to_string(void const *);

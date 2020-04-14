@@ -194,9 +194,17 @@ def parametrized_indices(lib, indices, params=(None,), default=(None,)):
     for i in indices:
         ps = list(params.get(names[i], default))
         n = lib.n_parameters(i)
+
+        # replace None with all of the prespecified indices
         while None in ps:
             ps.remove(None)
             ps.extend(range(n))
+
+        # add a single empty argument pack if none exists
+        if not ps:
+            ps.append(tuple())
+
+        # yield each parameter pack for this test
         for p in ps:
             if isinstance(p, int) and p >= n:
                 raise IndexError("Parameter pack index {} is out of range for test '{}' (n={})".format(p, names[i], n))
