@@ -187,8 +187,8 @@ def parametrized_indices(lib, indices, params=(None,), default=(None,)):
     names = lib.test_names()
     if not hasattr(params, 'get'):
         try:
-            params[0][0]
-        except (TypeError, IndexError):
+            assert isinstance(params[0], (list, tuple, dict))
+        except (TypeError, IndexError, AssertionError):
             params = [params]
         params, default = {}, params
     for i in indices:

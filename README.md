@@ -1,9 +1,9 @@
-``` 
- _ _ _          _ _ 
-| (_) |_      _(_) |
-| | | \ \ /\ / / | |
-| | | |\ V  V /| | |
-|_|_|_| \_/\_/ |_|_|
+```
+                              _ _ _          _ _
+                             | (_) |_      _(_) |
+                             | | | \ \ /\ / / | |
+                             | | | |\ V  V /| | |
+                             |_|_|_| \_/\_/ |_|_|
 ```
 
 # lilwil
@@ -39,38 +39,41 @@ I've found that these costs are well worth it, and most of my code for the last 
     - [Requirements](#requirements)
     - [Python](#python)
     - [CMake](#cmake)
-  - [Writing tests in C++](#writing-tests-in-c)
+  - [Using `lilwil` in C++](#using-lilwil-in-c)
     - [Unit test declaration](#unit-test-declaration)
-    - [`Context` API](#context-api)
+    - [`lilwil::Context`](#lilwilcontext)
       - [Logging](#logging)
       - [Test scopes](#test-scopes)
-        - [Sections](#sections)
-        - [Tags](#tags)
-        - [Suites](#suites)
       - [Assertions](#assertions)
       - [Leaving a test early](#leaving-a-test-early)
       - [Timings](#timings)
       - [Approximate comparison](#approximate-comparison)
     - [Macros](#macros)
-      - [`Glue` and `AddKeyPairs`](#glue-and-addkeypairs)
-    - [Test adaptors](#test-adaptors)
+    - [`lilwil::Value`](#lilwilvalue)
+    - [Customized test functions](#customized-test-functions)
       - [C++ type-erased function](#c-type-erased-function)
-      - [Type-erased value](#type-erased-value)
-      - [Python function](#python-function)
+      - [Storing and retrieving a global value](#storing-and-retrieving-a-global-value)
+      - [Adding a Python function as a test](#adding-a-python-function-as-a-test)
     - [Templated functions](#templated-functions)
+    - [Global suite implementation and thread safety](#global-suite-implementation-and-thread-safety)
+  - [Customization points](#customization-points)
+    - [`lilwil::ToString`](#lilwiltostring)
+    - [`lilwil::AddKeyPairs`](#lilwiladdkeypairs)
+    - [`lilwil::Glue`](#lilwilglue)
+    - [`lilwil::Handler`](#lilwilhandler)
   - [Running tests from the command line](#running-tests-from-the-command-line)
     - [Python threads](#python-threads)
     - [Writing your own script](#writing-your-own-script)
     - [An example](#an-example)
-  - [`Handler` C++ API](#handler-c-api)
   - [`liblilwil` Python API](#liblilwil-python-api)
     - [Exposed Python functions via C API](#exposed-python-functions-via-c-api)
     - [Exposed Python C++ API](#exposed-python-c-api)
   - [`lilwil` Python API](#lilwil-python-api)
     - [Info](#info)
     - [Running a debugger](#running-a-debugger)
+    - [Exceptions](#exceptions)
+    - [Caller, Context](#caller-context)
   - [Notes](#notes)
-  - [Global suite implementation / thread safety](#global-suite-implementation--thread-safety)
 
 ## Simple usage
 
@@ -150,7 +153,7 @@ Write a CMake target for your own `SHARED` or `OBJECT` library(s). Use the CMake
 
 Run CMake with `-DLILWIL_PYTHON={my python executable}` to customize. CMake's `find_package(Python)` is not used used by default since only the include directory is needed. You can find your include directory from Python via `sysconfig.get_path('include')` if you need to set it manually for some reason.
 
-## Writing tests in C++
+## Using `lilwil` in C++
 
 `lilwil` is focused on being customizable and tries not to assume much about your desired behavior. As such, I think a good way to start using `lilwil` in a big project is to write your own header file, e.g. `Test.h`, which:
 
@@ -231,10 +234,7 @@ struct lilwil::ToString<T, std::void_t<decltype(std::declval<std::ostream &>() <
 
 #### Test scopes
 
-`Context` represents the current scope as a sequence of strings. The default stringification of a scope is to join its parts together with `/`.
-
-##### Sections
-You can open a new section as follows:
+`Context` represents the current scope as a sequence of strings. The default stringification of a scope is to join its parts together with `/`. You can open a new section as follows:
 
 ```c++
 // open a child scope (functor takes parameters (Context, args...))
@@ -249,13 +249,9 @@ double x = ct.section("section name", [](Context ct, auto y) {
 
 The functor you pass in is passed as its first argument a new `Context` with a scope which has been appended to. Clearly, you can make sections within sections as needed.
 
-##### Tags
+**Tags?**. As for `Catch`-style tags, there aren't any in `lilwil` outside of this scoping behavior. However, for example, you can run a subset of tests via a regex on the command line (e.g. `-r "test/numeric/.*"`). Or you can write your own Python code to do something more sophisticated.
 
-As for `Catch`-style tags, there aren't any in `lilwil` outside of this scoping behavior. However, for example, you can run a subset of tests via a regex on the command line (e.g. `-r "test/numeric/.*"`). Or you can write your own Python code to do something more sophisticated.
-
-##### Suites
-
-`lilwil` is really only set up for one suite to be exported from a built module. This suite has static storage (see `Suite.h` for implementation). If you just want subsets of tests, use the above scope functionality.
+**Suites?**. `lilwil` is really only set up for one suite to be exported from a built module. This suite has static storage (see `Suite.h` for implementation). If you just want subsets of tests, use the above scope functionality.
 
 #### Assertions
 
@@ -328,12 +324,125 @@ The following macros are defined with `LILWIL_` prefix if `Macros.h` is included
 
 Look at `Macros.h` for details, it's pretty simple.
 
+### `lilwil::Value`
 
-#### `Glue` and `AddKeyPairs`
+The standard test takes any type of functor and converts it into (more or less) `std::function<Value(Context, std::vector<Value>)>`. `lilwil::Value` is a type erased object consisting of
+
+1. A `std::any`, accessible via `.any()`. This implies your values should be copy-constructible.
+2. A formatter function pointer, accessible by `.to_string() -> std::string`. Typically this calls the specialization of `ToString` on the held type.
+
+There is also a `Convert` API which is a simple way to customize type conversions. This is exposed via the member function `.view_as<T>() -> T`, which will throw on conversion errors. As implied in the name, `view_as` considers itself free to return a reference-like class (e.g. `std::string_view`), so the `Value` should stay in scope as needed. You can also use `std::any_cast` or the analogous `.target<T>() -> T const *` to access a known type.
+
+This is, I think, a simple but flexible implementation of what is wanted in a test framework. Almost any type is permissible (which helps with test pipelining, etc.), and any `Value` may be printed via `to_string`. On the other hand, the implemented Python handlers handle a few types as special cases:
+
+- integers, floats, bools, and strings are all converted as native Python builtins.
+- empty `Value`s are converted to `None`.
+- there is some support for numeric `ndarray`-style classes via `memoryview`, although I think this will only work for input `Value` arguments. These are usable via `lilwil::ArrayView`.
+- I didn't want to handle Python structured objects in any complicated way, so the default behavior for `dict`, `tuple`, and `list` is to JSON-serialize them and pass them into C++ as a `lilwil::JSON` class. Note that you'll need to bring in your own C++ JSON library (e.g. `nlohmann/json`) to extract the values in C++.
+
+Type conversion, especially between languages, is not for the faint of heart, and `lilwil` accordingly tries to as little as possible beyond what is obvious.
+
+### Customized test functions
+
+#### C++ type-erased function
+
+If a C++ exception occurs while running this type of test, the runner generally reports and catches it. However, handlers may throw instances of `ClientError` (subclass of `std::exception`), which are not caught.
+
+This type of test may be called from anywhere in type-erased fashion:
+```c++
+Value output = call("my-test-name", (Context) ct, args...);
+```
+
+The output from the function must be convertible to `Value` in this case.
+
+Or, if the test declaration is visible via non-macro version, you can call it without type erasure:
+```c++
+auto test1 = unit_test("test 1", [](Context ct, int i) {return MyType{i};);
+...
+MyType t = test1(ct, 6);
+```
+
+#### Storing and retrieving a global value
+
+Sometimes it's nice to add tests which just return a fixed `Value` without computation. For instance, you can add a value from Python:
+
+```python
+lib.add_value('number-of-threads', 4)
+```
+
+and retrieve it while running tests in C++:
+```c++
+int n = get_value("number-of-threads").view_as<int>(); // preferred, n = 4
+int n = call("number-of-threads", my_context).view_as<int>(); // equivalent
+```
+
+#### Adding a Python function as a test
+
+Or sometimes, you might want to make a type-erased function in Python (this should generally only use primitive types).
+
+```python
+lib.add_test('times-two', lambda i: i * 2)
+```
+
+and retrieve it while running tests in C++:
+```c++
+int n = call("times-two", 5).view_as<int>(); // n = 10
+```
+
+### Templated functions
+
+You might find it useful to test different types via the following within a test case
+```c++
+lilwil::Pack<int, Real, bool>::for_each([&ct](auto t) {
+    using type = decltype(*t);
+    // do something with type and ct
+});
+```
+This is just using the `Pack` type that `lilwil` uses for signature deduction. For more advanced functionality try something like `boost::hana`.
+
+
+### Global suite implementation and thread safety
+
+For interested developers, see `<lilwil/Impl.h>` (not included by tests) for the global suite implementation. It is possible to swap out the given implementation if you have a good reason to do so. What needs to be met is the read_suite / write_suite interface below, which call functors in a thread-safe manner on a STL container like vector. (It really wasn't a concern of mine that test keys be unique, so something like `std::map` is not used.)
+
+Define `LILWIL_CUSTOM_SUITE` to your own header to define your own behavior completely. Otherwise, define `LILWIL_NO_MUTEX` to avoid locking around the test suite, which is in general fine except when modifying global tests or values from *within* a test. `LILWIL_NO_MUTEX` will be assumed if `<shared_mutex>` is unavailable, but a warning will be issued in this case.
+
+The non-threadsafe interface is as follows:
+
+```c++
+std::vector<TestCase> & suite() {
+    static std::vector<TestCase> static_suite;
+    return static_suite;
+}
+
+template <class F>
+auto write_suite(F &&functor) {return functor(suite());}
+
+template <class F>
+auto read_suite(F &&functor) {return functor(static_cast<Suite const &>(suite()));}
+```
+
+The threadsafe interface (the default) is like the above, but using a `shared_lock`/`unique_lock` on a `std::shared_timed_mutex`.
+
+
+## Customization points
+
+There are a few customization points in the C++ API which are implemented via struct template specialization.
+
+### `lilwil::ToString`
+
+```c++
+template <class T, class SFINAE=void>
+struct ToString {
+    String operator()(T const &t) const; // Prototype, define your own behavior like this
+};
+```
+
+### `lilwil::AddKeyPairs`
 You may want to specialize your own behavior for logging an expression of a given type. This behavior can be modified by specializing `AddKeyPairs`, which is defaulted as follows:
 
 ```c++
-template <class T, class=void>
+template <class T, class SFINAE=void>
 struct AddKeyPairs {
     void operator()(Logs &v, T const &t) const {v.emplace_back(KeyPair{{}, make_output(t)});}
 };
@@ -343,7 +452,10 @@ This means that calling `ct.info(expr)` will default to making a message with an
 
 In general, the key in a `KeyPair` is expected to be one of a limited set of strings that is recognizable by the registered handlers (hence why the key is of type `std::string_view`). Make sure any custom keys have static storage duration.
 
+### `lilwil::Glue`
+
 A common specialization used in `lilwil` is for a key value pair of any types called a `Glue`:
+
 ```c++
 template <class K, class V>
 struct Glue {
@@ -368,68 +480,29 @@ struct AddKeyPairs<Glue<K, V>> {
 
 A more complicated example is `ComparisonGlue`, which logs the left hand side, right hand side, and operand type as 3 separate `KeyPair`s. This is used in the implementation of the comparison assertions `ct.equal(...)` and the like.
 
-### Test adaptors
 
-#### C++ type-erased function
+### `lilwil::Handler`
 
-The standard test takes any type of functor and converts it into (more or less) `std::function<Value(Context, std::vector<Value>)>`.
+Events are kept track of via a simple integer `enum`. It is relatively easy to extend to more event types.
 
-If a C++ exception occurs while running this type of test, the runner generally reports and catches it. However, handlers may throw instances of `ClientError` (subclass of `std::exception`), which are not caught.
+A handler is registered to be called if a single fixed `Event` is signaled. It is implemented as a `std::function`. If no handler is registered for a given event, nothing is called.
 
-This type of test may be called from anywhere in type-erased fashion:
 ```c++
-Value output = call("my-test-name", (Context) ct, args...);
+enum Event : std::uint_fast32_t {Failure=0, Success=1, Exception=2, Timing=3, Skipped=4}; // roughly
+using Handler = std::function<bool(Event, Scopes const &, Logs &&)>;
 ```
 
-The output from the function must be convertible to `Value` in this case.
+Obviously, try not to rely explicitly on the actual `enum` values of `Event` too much.
 
-Or, if the test declaration is visible via non-macro version, you can call it without type erasure:
+Since it's so commonly used, `lilwil` tracks the number of times each `Event` is signaled by a test, whether a handler is registered or not. `Context` has a non-owning reference to a vector of `std::atomic<std::size_t>` to keep these counts in a threadsafe manner. You can query the count for a given `Event`:
+
 ```c++
-auto test1 = unit_test("test 1", [](Context ct, int i) {return MyType{i};);
-...
-MyType t = test1(ct, 6);
+std::ptrdiff_t n_fail = ct.count(Failure); // const, noexcept; gives -1 if the event type is out of range
 ```
-
-#### Type-erased value
-
-Sometimes it's nice to add tests which just return a fixed `Value` without computation. For instance, you can add a value from Python:
-
-```python
-lib.add_value('number-of-threads', 4)
-```
-
-and retrieve it while running tests in C++:
-```c++
-int n = get_value("number-of-threads").view_as<int>(); // preferred, n = 4
-int n = call("number-of-threads", my_context).view_as<int>(); // equivalent
-```
-
-#### Python function
-
-Or sometimes, you might want to make a type-erased function in Python (this should generally only use primitive types).
-
-```python
-lib.add_test('times-two', lambda i: i * 2)
-```
-
-and retrieve it while running tests in C++:
-```c++
-int n = call("times-two", 5).view_as<int>(); // n = 10
-```
-
-### Templated functions
-
-You might find it useful test different types via the following within a test case
-```c++
-lilwil::Pack<int, Real, bool>::for_each([&ct](auto t) {
-    using type = decltype(*t);
-    // do something with type and ct
-});
-```
-For more advanced functionality try something like `boost::hana`.
 
 ## Running tests from the command line
 
+CHANGE
 ```bash
 python -m lilwil.cli -a mylib # run all tests from mylib.so/mylib.dll/mylib.dylib
 ```
@@ -483,6 +556,7 @@ cli.main(**kwargs)
 ### An example
 
 There is a lot of programmability within your own code for running tests in different styles. Let's use the `Value` registered above to write a helper to repeat a test until the allowed test time is used up.
+
 ```c++
 template <class F>
 void repeat_test(Context const &ct, F const &test) {
@@ -490,31 +564,16 @@ void repeat_test(Context const &ct, F const &test) {
     while (Clock::now() < max) test();
 }
 ```
+
 Then we can write a repetitive test which short-circuits like so:
+
 ```c++
 UNIT_TEST("my-test") = [](Context ct) {
     repeat_test(ct, [&] {run_some_random_test(ct);});
 };
 ```
+
 You could define further extensions could run these iterations in parallel. Functionality like `repeat_test` is intentionally left out of the API so that users can define their own behavior.
-
-## `Handler` C++ API
-Events are kept track of via a simple integer `enum`. It is relatively easy to extend to more event types.
-
-A handler is registered to be called if a single fixed `Event` is signaled. It is implemented as a `std::function`. If no handler is registered for a given event, nothing is called.
-
-```c++
-enum Event : std::uint_fast32_t {Failure=0, Success=1, Exception=2, Timing=3, Skipped=4}; // roughly
-using Handler = std::function<bool(Event, Scopes const &, Logs &&)>;
-```
-
-Obviously, try not to rely explicitly on the actual `enum` values of `Event` too much.
-
-Since it's so commonly used, `lilwil` tracks the number of times each `Event` is signaled by a test, whether a handler is registered or not. `Context` has a non-owning reference to a vector of `std::atomic<std::size_t>` to keep these counts in a threadsafe manner. You can query the count for a given `Event`:
-
-```c++
-std::ptrdiff_t n_fail = ct.count(Failure); // const, noexcept; gives -1 if the event type is out of range
-```
 
 ## `liblilwil` Python API
 
@@ -607,7 +666,9 @@ I don't use gdb, but I assume it would be done analogously:
 gdb --args python3 ./test.py -s "mytest" # ... and other arguments
 ```
 
+<!--
 ## Done
+
 ### Breaking out of tests early
 At the very least put `start_time` into Context.
 Problem with giving the short circuit API is partially that it can be ignored in a test.
@@ -618,7 +679,7 @@ Standardize what handler return value means, add skip event if needed.
 ### Object size
 - Can explicitly instantiate `Context` copy constructors etc.
 - Write own version of `std::function` (maybe)
- 
+
 ### Library/module name
 One option is leave as is. The library is built in whatever file, always named liblilwil.
 This is only usable if Python > 3.4 and specify -a file_name.
@@ -636,18 +697,18 @@ The only difference in cost is that
 - it appends to the vector even when not needed (instead of having reserved slot)
 - it constructs 2 values even when not needed
 - I think these are trivial, leave as is.
-- It is flushed on every event (maybe should last for multiple events? or is that confusing?)
+- It is flushed on every event (maybe should last for multiple events? or is that confusing?) -->
 
 ### Exceptions
 `ClientError` and its subclasses are not caught by test runner. All others are.
 
-### Signals
+<!-- ### Signals
 - possible to use `PyErr_SetInterrupt`
 - but the only issue is when C++ running a long time without Python
 - that could be the case on a test with no calls to handle of a given type.
 - actually it appears there's no issue if threads are being used!
-- so default is just to use 1 worker thread.
-
+- so default is just to use 1 worker thread. -->
+<!--
 ### Caller, Context
 Right now Caller just contains a single callback utility e.g. GIL.
 
@@ -669,7 +730,6 @@ I guess the current strategy is fine.
 
 Also caller? copyable? -->
 
-
 ## Notes
 
 We use a slightly adhoc implementation of Value. Any printable, copyable object may be used as a Value. Under the hood, a `std::any` and a type-erased function pointer for printing is used. However, the only guaranteed types that can passed in from the CLI as arguments are builtins:
@@ -679,26 +739,4 @@ We use a slightly adhoc implementation of Value. Any printable, copyable object 
 - `Real` (typedef of `double`)
 
 In addition, null values can be created and passed in. There might be some complaint that structured types are not available. The response would be that in a unit testing scenario, it would probably make more sense to pass in a structured data object via something like a JSON string anyway. In the future though it may be worth thinking about some better support for structured types however, like numerical arrays or key-value maps.
-
-
-## Global suite implementation / thread safety
-
-Some custom behavior is allowed for the global test suite. What needs to be met is the read_suite / write_suite interface below, which call functors in a thread-safe manner on a STL container like vector. Define `LILWIL_CUSTOM_SUITE` to your own header to define your own behavior completely. Otherwise, define `LILWIL_NO_MUTEX` to avoid locking around the test suite, which is in general fine except when modifying global tests or values from *within* a test. `LILWIL_NO_MUTEX` will be assumed if `<shared_mutex>` is unavailable, but a warning will be issued in this case.
-
-The non-threadsafe interface is as follows:
-
-```c++
-std::vector<TestCase> & suite() {
-    static std::vector<TestCase> static_suite;
-    return static_suite;
-}
-
-template <class F>
-auto write_suite(F &&functor) {return functor(suite());}
-
-template <class F>
-auto read_suite(F &&functor) {return functor(static_cast<Suite const &>(suite()));}
-```
-
-The threadsafe interface (the default) is like the above, but using a `shared_lock`/`unique_lock` on a `std::shared_timed_mutex`.
 
