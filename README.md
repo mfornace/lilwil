@@ -57,7 +57,7 @@ I've found that these costs are well worth it, and most of my code for the last 
     - [Templated functions](#templated-functions)
     - [Speed and performance](#speed-and-performance)
     - [Global suite implementation and thread safety](#global-suite-implementation-and-thread-safety)
-  - [Running tests from the command line](#running-tests-from-the-command-line)
+  - [Running `lilwil` from the command line](#running-lilwil-from-the-command-line)
     - [Extending the Python CLI](#extending-the-python-cli)
     - [Python threads](#python-threads)
     - [Running a debugger](#running-a-debugger)
@@ -67,14 +67,18 @@ I've found that these costs are well worth it, and most of my code for the last 
     - [`lilwil::AddKeyPairs`](#lilwiladdkeypairs)
     - [`lilwil::Glue`](#lilwilglue)
     - [`lilwil::Handler`](#lilwilhandler)
+      - [Exceptions](#exceptions)
   - [`liblilwil` Python API](#liblilwil-python-api)
     - [Exposed Python functions via C API](#exposed-python-functions-via-c-api)
     - [Exposed Python C++ API](#exposed-python-c-api)
   - [`lilwil` Python API](#lilwil-python-api)
-    - [Info](#info)
-    - [Exceptions](#exceptions)
+  - [Done](#done)
+    - [Breaking out of tests early](#breaking-out-of-tests-early)
+    - [Object size](#object-size)
+    - [Library/module name](#librarymodule-name)
+    - [FileLine](#fileline)
     - [Caller, Context](#caller-context)
-  - [Notes](#notes)
+  - [Random notes](#random-notes)
 
 ## Simple usage
 
@@ -445,7 +449,7 @@ auto read_suite(F &&functor) {return functor(static_cast<Suite const &>(suite())
 
 The threadsafe interface (the default) is like the above, but using a `shared_lock`/`unique_lock` on a `std::shared_timed_mutex`.
 
-## Running tests from the command line
+## Running `lilwil` from the command line
 
 By default, `lilwil` creates an executable Python script in your build directory. This is done mostly to set some defaults from the CMake configuration. It's almost identical just to running `python -m lilwil.cli` directly. The script is given a `.py` suffix, so it is also importable from your own Python script or interpreter.
 
