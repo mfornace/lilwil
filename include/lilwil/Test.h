@@ -33,11 +33,11 @@ struct TestSignature<F, std::void_t<typename Signature<F>::return_type>> : Signa
 /******************************************************************************/
 
 template <class F, class ...Ts>
-Value value_invoke(F const &f, Context &c, Ts &&... ts) {
-    using R = std::remove_cv_t<std::invoke_result_t<F, Context &, Ts...>>;
+Value value_invoke(F const &f, Ts &&... ts) {
+    using R = std::remove_cv_t<std::invoke_result_t<F, Ts...>>;
     if constexpr(std::is_same_v<void, R>)
-        return std::invoke(f, c, static_cast<Ts &&>(ts)...), Value();
-    else return std::invoke(f, c, static_cast<Ts &&>(ts)...);
+        return std::invoke(f, static_cast<Ts &&>(ts)...), Value();
+    else return std::invoke(f, static_cast<Ts &&>(ts)...);
 }
 
 template <class T>
@@ -48,6 +48,9 @@ std::decay_t<T> cast_index(ArgPack const &v, packs::IndexedType<T> i) {
 
 template <class R, class C, class ...Ts>
 Pack<Ts...> skip_first_two(Pack<R, C, Ts...>);
+
+template <class R>
+Pack<> skip_first_two(Pack<R>);
 
 /******************************************************************************/
 
@@ -65,7 +68,8 @@ struct TestAdapter {
             if (args.size() != Sig::size)
                 throw std::runtime_error(wrong_number_string(Sig::size, args.size()));
             return Sig::indexed([&](auto ...ts) {
-                return value_invoke(function, ct, cast_index(args, ts)...);
+                if constexpr(TestSignature<F>::size == 1) return value_invoke(function);
+                else return value_invoke(function, ct, cast_index(args, ts)...);
             });
         } catch (Skip const &e) {
             ct.info("value", e.message);

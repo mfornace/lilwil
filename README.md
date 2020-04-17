@@ -1,5 +1,5 @@
-``` 
- _ _ _          _ _ 
+```
+ _ _ _          _ _
 | (_) |_      _(_) |
 | | | \ \ /\ / / | |
 | | | |\ V  V /| | |
@@ -158,7 +158,7 @@ Unit tests are functors which:
 - take any other arguments of a type convertible from `lilwil::Value`
 - return `void` or an object convertible to `lilwil::Value`
 
-You can use `auto` instead of `lilwil::Context` if it is the only parameter, though it's a bit unrecommended. You can't use `auto` for the other parameters unless you specialize the `lilwil` signature deduction.
+You can use `auto` instead of `lilwil::Context` if it is the only parameter, though it's a bit unrecommended. You can't use `auto` for the other parameters unless you specialize the `lilwil` signature deduction. (You may additionally use a functor with no arguments at all, although that won't result in much of a test case.)
 
 ```c++
 // unit test of the given name
@@ -175,7 +175,7 @@ UNIT_TEST("my-test-name", "my test comment") = [](lilwil::Context ct, ...) {...}
 
 ### `Context` API
 
-Most methods on `Context` are non-const. However, `Context` is fine to be copied or moved around, so it has approximately the same thread safety as `std::vector` and other STL containers (i.e. multiple readers are fine, reading and writing at the same time is bad). A default-constructed `Context` is valid but not very useful; you shouldn't construct it yourself unless you know what you're doing.
+Most methods on `Context` are non-const. However, `Context` is fine to be copied or moved around, so it has approximately the same thread safety as `std::vector` and other STL containers (i.e. multiple readers are fine, reading and writing at the same time is bad). A default-constructed `Context` is valid but almost always useless.
 
 To run things in parallel within C++, just make multiple copies of your `Context` as needed. However, the registered handlers must be thread safe when called concurrently for this to work. (The included Python handlers are thread safe.)
 
