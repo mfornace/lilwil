@@ -9,12 +9,10 @@ if '@LILWIL_DEFAULT_PYTHON_PATH@'[0] != '@':
 if '@LILWIL_DEFAULT_LIBRARY_PATH@'[0] != '@':
     sys.path.append('@LILWIL_DEFAULT_LIBRARY_PATH@')
 
+# The following may help if the shared library lives in the same directory as this executable
+sys.path.append(os.path.dirname(__file__))
+
 from lilwil import cli
-
-# The following assumes the shared library lives in the same directory as this executable
-sys.path.insert(0, os.path.dirname(__file__))
-
-program_name = os.path.basename(__file__)
 
 lib_name = '@LILWIL_DEFAULT_LIBRARY_NAME@'
 
@@ -23,11 +21,10 @@ if lib_name[0] == '@':
 
 if __name__ == '__main__':
     # Build the parser using the above defaults
-    parser = cli.parser(prog=program_name, lib=lib_name)
+    parser = cli.parser(prog=os.path.basename(__file__), lib=lib_name)
 
-    # Examples to add your own custom arguments
+    # Example to add your own custom arguments
     # parser.add_argument('--time', type=float, default=float('inf'), help='maximum test time')
-    # parser.add_argument('--verbose', type=int, default=0, help='print stuff during tests')
 
     # Parse command line arguments
     args = vars(parser.parse_args())
@@ -35,9 +32,8 @@ if __name__ == '__main__':
     # Import the library that was deduced
     lib = cli.import_library(args['lib'])
 
-    # Examples to apply your own arguments to the test suite
+    # Example to apply your own arguments to the test suite
     # lib.add_value('max_time', args.pop('time'))
-    # lib.add_value('verbose', args.pop('verbose'))
 
     # Call the underlying implementation and exit (use cli.main to run but not exit)
     cli.exit_main(**args)

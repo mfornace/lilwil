@@ -21,12 +21,13 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
 
     p = ArgumentParser(prog=prog, description=description, **kwargs)
     s(p, '--list',               '-l', help='list all test names')
-    o(p, str, 'PATH', '--lib',   '-a', help='file path for test library (default %s)' % repr(lib), default=str(lib))
+    o(p, str, 'PATH', '--lib',   '-L', help='file path for test library (default %s)' % repr(lib), default=str(lib))
     o(p, int, 'INT', '--jobs',   '-j', help='# of threads (default %d; 0 to use only main thread)' % jobs, default=jobs)
-    o(p, str, 'STR', '--params', '-p', help='JSON file path or Python eval-able parameter string')
     o(p, str, 'RE',  '--regex',  '-r', help="specify tests with names matching a given regex")
     s(p, '--exclude',            '-x', help='exclude rather than include specified cases')
     s(p, '--capture',            '-c', help='capture std::cerr and std::cout')
+    o(p, str, 'STR', '--args',   '-a', action='append', help='int or Python tuple expression for a parameter pack to apply to each test (may be specified multiple times)')
+    o(p, str, 'STR', '--params', '-p', action='append', help='JSON file for all parameters (in {"name": [packs...], ...} form; may be specified multiple times)')
     s(p, '--gil',                '-g', help='keep Python global interpeter lock on')
     o(p, str, '', 'tests', nargs='*',  help='test names (if not given, specifies all tests that can be run without any user-specified parameters)')
 
@@ -88,17 +89,18 @@ def run_suite(lib, keypairs, masks, gil, cout, cerr, exe=map):
 def main(run=run_suite, lib='libwil', list=False, no_default=False, failure=False, success=False, brief=False,
     exception=False, timing=False, quiet=False, capture=False, gil=False, exclude=False,
     no_color=False, regex=None, out='stdout', out_mode='w', xml=None, xml_mode='a+b', suite='lilwil',
-    teamcity=None, json=None, json_indent=None, jobs=0, tests=None, params=None, skip=False, no_sync=None):
+    teamcity=None, json=None, json_indent=None, jobs=0, tests=None, args=None, params=None, skip=False, no_sync=None):
     '''Main non-argparse function for running a subset of lilwil tests with given options'''
 
     lib = import_library(lib)
     indices = test_indices(lib.test_names(), exclude, tests, regex)
-    keypairs = tuple(parametrized_indices(lib, indices, load_parameters(params)))
+    keypairs = tuple(parametrized_indices(lib, indices, load_parameters(args, params)))
 
     if list:
         fmt = '%{}d: %s'.format(len(str(len(keypairs))))
         for i, k in enumerate(keypairs):
             print(fmt % (i, lib.test_info(k[0])[0]))
+        print('\n(%d total tests)' % len(keypairs))
         return
 
     if no_default:
@@ -150,7 +152,7 @@ def exit_main(no_color=False, **kwargs):
     '''
     try:
         main(no_color=no_color, **kwargs)
-        return
+        sys.exit(0)
     except Exception as e:
         if no_color:
             raise

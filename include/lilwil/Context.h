@@ -151,24 +151,29 @@ struct Context : BaseContext {
 
     /******************************************************************************/
 
-    template <class ...Ts>
-    void timing(Ts &&...ts) {handle(Timing, std::forward<Ts>(ts)...);}
-
     template <class F, class ...Args>
-    auto timed(std::size_t n, F &&f, Args &&...args) {
+    std::invoke_result_t<F &&, Args &&...> timed(F &&f, Args &&...args) {
         auto const start = Clock::now();
         if constexpr(std::is_same_v<void, std::invoke_result_t<F &&, Args &&...>>) {
-            for (;n--;) std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
+            std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
             auto const elapsed = std::chrono::duration<double>(Clock::now() - start).count();
-            handle(Timing, glue("value", elapsed));
-            return elapsed;
+            handle(Timing, glue("seconds", elapsed));
         } else {
-            for (;--n;) std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
             auto result = std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
             auto const elapsed = std::chrono::duration<double>(Clock::now() - start).count();
-            handle(Timing, glue("value", elapsed));
+            handle(Timing, glue("seconds", elapsed));
             return result;
         }
+    }
+
+    template <class F, class ...Args>
+    auto timing(std::size_t n, F &&f, Args &&...args) {
+        auto const start = Clock::now();
+        for (std::size_t i = 0; i != n; ++i)
+            std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
+        auto const elapsed = std::chrono::duration<double>(Clock::now() - start).count();
+        handle(Timing, glue("seconds", elapsed), glue("repeats", n));
+        return elapsed;
     }
 
     template <class Bool=bool, class ...Ts>
