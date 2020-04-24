@@ -149,23 +149,63 @@ String address_to_string(void const *p) {
 
 /******************************************************************************/
 
-// String escape from https://gist.github.com/timmi-on-rails/173c496a9c5a33ad9df7c6428b9a077b
-#warning "customize for \ n"
-std::string ToString<std::string>::operator()(std::string s) const {
-    std::stringstream stream;
+std::string ToString<Ops>::operator()(Ops s) const {
+    std::string out;
+    switch (s) {
+#ifdef LILWIL_UNICODE
+        case Ops::eq:   {out = "="; break;}
+        case Ops::ne:   {out = u8"\u2260"; break;}
+        case Ops::lt:   {out = "<"; break;}
+        case Ops::gt:   {out = ">"; break;}
+        case Ops::le:   {out = u8"\u2264"; break;}
+        case Ops::ge:   {out = u8"\u2265"; break;}
+        case Ops::near: {out = u8"\u2248"; break;}
+#else
+        case Ops::eq:   {out = "=="; break;}
+        case Ops::ne:   {out = "!="; break;}
+        case Ops::lt:   {out = "<"; break;}
+        case Ops::gt:   {out = ">"; break;}
+        case Ops::le:   {out = "<="; break;}
+        case Ops::ge:   {out = ">="; break;}
+        case Ops::near: {out = "=="; break;}
+#endif
+    }
+    return out;
+}
 
-    stream << std::uppercase << std::hex << std::setfill('0');
+std::string ToString<std::string_view>::operator()(std::string_view s) const {
+    static constexpr auto hexes = "0123456789ABCDEF";
 
-    for(char ch : s) {
-        int code = static_cast<unsigned char>(ch);
+    std::string out;
+    if (s.size() + 2 < out.capacity()) // avoid going out of SSO
+        out.reserve(s.size() + 16); // can tune this
 
-        if (std::isprint(code)) {
-            stream.put(ch);
+    out.push_back('"');
+    for (auto c : s) {
+        if (' ' <= c && c <= '~') {
+            out.push_back(c);
         } else {
-            stream << "\\x" << std::setw(2) << code;
+            switch (c) {
+                case '\\': {out += "\\\\"; break;}
+                case '\?': {out += "\\?"; break;}
+                case '\"': {out += "\\\""; break;}
+                case '\a': {out += "\\a"; break;}
+                case '\b': {out += "\\b"; break;}
+                case '\f': {out += "\\f"; break;}
+                case '\n': {out += "\\n"; break;}
+                case '\r': {out += "\\r"; break;}
+                case '\t': {out += "\\t"; break;}
+                case '\v': {out += "\\v"; break;}
+                default: {
+                    out += "\\x";
+                    out.push_back(hexes[c >> 4]);
+                    out.push_back(hexes[c & 0xF]);
+                }
+            }
         }
     }
-    return stream.str();
+    out.push_back('"');
+    return out;
 }
 
 /******************************************************************************/

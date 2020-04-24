@@ -39,7 +39,7 @@ template <class T>
 struct ToString<T, std::void_t<decltype(std::declval<std::ostream &>() << std::declval<T const &>())>> {
     std::string operator()(T const &t) const {
         std::ostringstream os;
-        os << t;
+        os << std::boolalpha << t;
         return os.str();
     }
 };
@@ -78,7 +78,7 @@ auto test1 = lilwil::unit_test("general-usage", [](lilwil::Context ct) {
 
     auto xxx = 5, yyy = 6;
 
-    ct.equal(xxx, yyy, {{"huh", goo()}, {goo()}});
+    ct.equal(xxx, yyy, "a comment", {{"huh", goo()}, {goo()}});
 
     if (!ct.equal(1, 2)) return std::vector<goo>(2);
     return std::vector<goo>(1);
@@ -105,7 +105,7 @@ UNIT_TEST("add-get-value") = [](lilwil::Context ct) {
     ct(HERE).throw_as<std::runtime_error>([]{throw std::runtime_error("runtime_error: uh oh");});
 };
 
-
+// doesn't get the source location
 auto test2 = lilwil::unit_test("test/with-parameters", "comment", [](lilwil::Context ct, goo const &, int a, std::string b) {
     // return goo();
     ct(HERE).equal(5, 5);
@@ -115,9 +115,20 @@ auto test2 = lilwil::unit_test("test/with-parameters", "comment", [](lilwil::Con
 UNIT_TEST("skipped-test/no-parameters") = [](lilwil::Context ct) {
     // return goo();
     ct(HERE).equal(5, 5);
-    ct(HERE).handle(lilwil::Skipped, "this test is skipped");
+    ct(HERE).skipped();
 };
 
+UNIT_TEST("relations") = [](lilwil::Context ct) {
+    ct(HERE).equal(5.0, 5);
+    ct(HERE).not_equal(5.1, 5);
+    ct(HERE).less(4.9, 5);
+    ct(HERE).greater(5.1, 5);
+    ct(HERE).greater_eq(5, 5);
+    ct(HERE).less_eq(4.9, 5);
+    ct(HERE).near(5 + 1e-13, 5);
+    ct(HERE).within(1e-8, 5, 5);
+    ct(HERE).all(std::equal_to<>(), std::vector<int>{1,2,3}, std::vector<int>{1,2,3});
+};
 
 std::shared_timed_mutex mut;
 
@@ -170,7 +181,7 @@ UNIT_TEST("mytest/check-something") = [](lilwil::Context ct) {
     // log a single key pair of information before an assertion.
     ct.info("value", 1.5);
 
-    ct("a message", "another messag\ne", 10.5); // log some messages
+    ct("a message", "another message with a newline \n and nonprintable \x01", 10.5); // log some messages
 
     ct(GLUE(5 + 5)); // same as ct.info("5 + 5", 10);
 

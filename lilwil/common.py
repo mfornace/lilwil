@@ -16,9 +16,6 @@ except NameError: # Python 2
 # Change this if you want a different scope delimiter for display purposes
 DELIMITER = '/'
 
-# Change this global if you can't use Unicode or you don't like it
-TRANSLATE = {'~': u'\u2248'}
-
 class Event(enum.IntEnum):
     '''Enum mirroring the libwil C++ one'''
 
@@ -283,7 +280,7 @@ def readable_logs(keys, values, indent):
     comp = ('__lhs', '__op', '__rhs') # comparisons
     while all(map(keys.__contains__, comp)):
         lhs, op, rhs = (pop_value(k, keys, values) for k in comp)
-        foreach(s.write, indent, 'required: {} {} {}\n'.format(lhs, TRANSLATE.get(op, op), rhs))
+        foreach(s.write, indent, 'required: {} {} {}\n'.format(lhs, op, rhs))
 
     for k, v in zip(keys, values): # all other logged keys and values
         foreach(s.write, indent, (k + ': ' if k else 'info: '), str(v), '\n')

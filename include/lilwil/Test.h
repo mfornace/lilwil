@@ -9,8 +9,12 @@ using packs::Signature;
 /******************************************************************************/
 
 struct Skip : std::runtime_error {
-    using std::runtime_error::runtime_error;
-    Skip() : std::runtime_error("Test skipped") {}
+    SourceLocation location;
+
+    Skip(char const *s="Test skipped", SourceLocation const &loc={}) : std::runtime_error(s), location(loc) {}
+    Skip(std::string const &s, SourceLocation const &loc={}) : std::runtime_error(s), location(loc) {}
+
+    Comment as_comment() const & {return Comment(what(), location.file, location.line);}
 };
 
 /******************************************************************************/
@@ -70,17 +74,16 @@ struct TestAdapter {
                 else return value_invoke(function, ct, cast_index(args, ts)...);
             });
         } catch (Skip const &e) {
-            ct.info("reason", e.what());
-            ct.handle(Skipped, {});
+            ct.handle(Skipped, e.as_comment(), {});
             throw;
         } catch (ClientError const &) {
             throw;
         } catch (std::exception const &e) {
             ct.info("reason", e.what());
-            ct.handle(Exception, {});
+            ct.handle(Exception, {}, {});
             throw;
         } catch (...) {
-            ct.handle(Exception, {});
+            ct.handle(Exception, {}, {});
             throw;
         }
     }

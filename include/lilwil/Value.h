@@ -8,11 +8,13 @@
 
 namespace lilwil {
 
+extern std::function<std::string(std::type_info const &)> type_name;
+
 /******************************************************************************/
 
 template <class T, class SFINAE=void>
 struct ToString {
-    std::string operator()(T const &t) const {return {};}
+    std::string operator()(T const &t) const {return "<" + type_name(typeid(T)) + ">";}
 };
 
 /******************************************************************************/
@@ -38,7 +40,7 @@ public:
     template <class T, std::enable_if_t<
         !std::is_same_v<T, std::any> && !std::is_same_v<T, Value>,
     int> = 0>
-    Value(T t) : val(std::move(t)), conv(impl<std::decay_t<T>>) {}
+    Value(T t) : val(std::move(t)), conv(impl<std::decay_t<T>>) {} // any uses decay_t
 
     std::string to_string() const {return has_value() ? conv(val) : std::string();}
 
@@ -65,6 +67,7 @@ public:
 
 /******************************************************************************/
 
+// Simple type erasure for a *reference* that can be printed
 class Ref {
     void const *reference = nullptr;
     std::string(*conv)(void const *) = nullptr;
@@ -76,14 +79,17 @@ public:
 
     constexpr Ref() noexcept = default;
 
-    template <class T>
-    Ref(T const *t) noexcept : reference(t), conv(impl<T const *>) {}
-
+    // Usual implicit construction from any object reference
     template <class T, std::enable_if_t<!std::is_pointer_v<T>, int> = 0>
-    Ref(T const &t) noexcept : reference(std::addressof(t)), conv(impl<T>) {}
+    constexpr Ref(T const &t) noexcept : reference(std::addressof(t)), conv(impl<T>) {}
 
+    // Elide taking a reference if the input is a pointer
+    template <class T>
+    constexpr Ref(T const *t) noexcept : reference(t), conv(impl<T const *>) {}
+
+    // Special case usually to make char const[N] into char const *
     template <class T, std::enable_if_t<std::is_array_v<T>, int> = 0>
-    Ref(T const &t) noexcept : Ref(static_cast<std::remove_extent_t<T> const *>(t)) {}
+    constexpr Ref(T const &t) noexcept : Ref(static_cast<std::remove_extent_t<T> const *>(t)) {}
 
     template <class T>
     static std::string impl(void const *p) {
@@ -181,22 +187,22 @@ struct ViewAs<std::string, SFINAE> {
 
 std::string address_to_string(void const *);
 
-// These are a few no-brainer specializations for ToString
-
+// The behavior for a string *value* is to quote and escape it
 template <>
-struct ToString<std::string> {
-    std::string operator()(std::string s) const;
+struct ToString<std::string_view> {
+    std::string operator()(std::string_view s) const;
 };
 
 template <>
 struct ToString<char const *> {
-    std::string operator()(char const *s) const {return s ? ToString<std::string>()(s) : "null";}
+    std::string operator()(char const *s) const {return s ? ToString<std::string_view>()(s) : "null";}
 };
 
 template <>
-struct ToString<std::string_view> {
-    std::string operator()(std::string_view s) const {return ToString<std::string>()(std::string(s));}
+struct ToString<std::string> {
+    std::string operator()(std::string s) const {return ToString<std::string_view>()(s);}
 };
+
 
 // void * is also included to avoid issues with specializing pointer types
 // i.e. if you specialize T * to print the dereferenced value, you'll get issues

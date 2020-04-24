@@ -1,6 +1,7 @@
 #pragma once
 #include "Config.h"
 #include "Value.h"
+#include "Approx.h"
 #include <string_view>
 
 namespace lilwil {
@@ -82,8 +83,10 @@ inline constexpr auto file_line(char const *s, int i) {return SourceLocation{s, 
 template <>
 struct AddKeyValue<SourceLocation> {
     void operator()(KeyValues &v, SourceLocation const &g) const {
-        v.emplace_back(KeyValue{"__file", g.file});
-        v.emplace_back(KeyValue{"__line", static_cast<Integer>(g.line)});
+        if (!g.file.empty()) {
+            v.emplace_back(KeyValue{"__file", g.file});
+            v.emplace_back(KeyValue{"__line", g.line});
+        }
     }
 };
 
@@ -91,43 +94,59 @@ struct Comment {
     std::string_view comment;
     SourceLocation location;
 
+    Comment(std::string_view comment, std::string_view file, int line) : comment(comment), location{file, line} {}
+
+    // change these for std::source_location when available
     Comment() = default;
     Comment(std::string_view comment) : comment(comment) {}
     Comment(char const *comment) : comment(comment) {}
-    Comment(std::string_view comment, std::string_view file, int line) : comment(comment), location{file, line} {}
 };
 
-// template <class T>
-// Comment<T> comment(T t, char const *s, int i) {return {t, {i, s}};}
-
-// template <class T>
-// struct AddKeyValue<Comment<T>> {
-//     void operator()(KeyValues &v, Comment<T> const &c) const {
-//         AddKeyValue<SourceLocation>()(v, c.location);
-//         v.emplace_back(KeyValue{"__comment", c.comment});
-//     }
-// };
+template <>
+struct AddKeyValue<Comment> {
+    void operator()(KeyValues &v, Comment const &c) const {
+        if (!c.comment.empty()) v.emplace_back(KeyValue{"__comment", c.comment});
+        AddKeyValue<SourceLocation>()(v, c.location);
+    }
+};
 
 /******************************************************************************/
 
-template <class L, class R>
-struct ComparisonGlue {
-    L lhs;
-    R rhs;
-    char const *op;
+enum class Ops {eq, ne, lt, gt, le, ge, near};
+
+template <>
+struct ToString<Ops> {
+    std::string operator()(Ops) const;
 };
 
+
 template <class L, class R>
-ComparisonGlue<L const &, R const &> comparison_glue(L const &l, R const &r, char const *op) {
-    return {l, r, op};
-}
+struct ComparisonGlue {
+    L left;
+    R right;
+    Ops relation;
+};
+
+constexpr Ops ops_of(Ops o) {return o;}
+
+template <class T> constexpr Ops ops_of(std::equal_to<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(std::not_equal_to<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(std::less<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(std::greater<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(std::greater_equal<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(std::less_equal<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(Near<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(Within<T>) {return Ops::eq;}
+
+template <class L, class R, class T>
+ComparisonGlue<L const &, R const &> comparison_glue(L const &l, R const &r, T const &op) {return {l, r, ops_of(op)};}
 
 template <class L, class R>
 struct AddKeyValue<ComparisonGlue<L, R>> {
     void operator()(KeyValues &v, ComparisonGlue<L, R> const &t) const {
-        v.emplace_back(KeyValue{"__lhs", t.lhs});
-        v.emplace_back(KeyValue{"__rhs", t.rhs});
-        v.emplace_back(KeyValue{"__op", std::string_view(t.op)});
+        v.emplace_back(KeyValue{"__lhs", t.left});
+        v.emplace_back(KeyValue{"__rhs", t.right});
+        v.emplace_back(KeyValue{"__op",  t.relation});
     }
 };
 

@@ -121,12 +121,13 @@ struct BaseContext : Base {
     /**************************************************************************/
 
     template <class ...Ts>
-    void handle(Event e, KeyPairs const refs, Ts &&...ts) {
+    void handle(Event e, Comment const &c, KeyPairs const v, Ts &&...ts) {
         if (e.index < handlers.size() && handlers[e.index]) {
             KeyStrings strings;
+            AddKeyValue<Comment>()(logs, c);
             (AddKeyValue<std::decay_t<Ts>>()(logs, std::forward<Ts>(ts)), ...);
             for (auto const &log: logs) strings.emplace_back(log.key, log.value.to_string());
-            for (auto const &log: refs) strings.emplace_back(log.key, log.value.to_string());
+            for (auto const &log: v) strings.emplace_back(log.key, log.value.to_string());
             handlers[e.index](e.index, scopes, strings);
         }
         if (counters && e.index < counters->size())
@@ -172,144 +173,122 @@ struct Context : BaseContext {
 
     /******************************************************************************/
 
-    template <class F, class ...Args>
-    std::invoke_result_t<F &&, Args &&...> timed(F &&f, Args &&...args) {
+    void skipped(Comment const &c={}, KeyPairs const &v={}) {handle(Skipped, c, v);}
+
+    template <class F>
+    std::invoke_result_t<F &&> timed(F &&f, Comment const &c={}, KeyPairs const &v={}) {
         auto const start = Clock::now();
-        if constexpr(std::is_same_v<void, std::invoke_result_t<F &&, Args &&...>>) {
-            std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
+        if constexpr(std::is_same_v<void, std::invoke_result_t<F &&>>) {
+            std::invoke(static_cast<F &&>(f));
             auto const elapsed = std::chrono::duration<double>(Clock::now() - start).count();
-            handle(Timing, {{"seconds", elapsed}});
+            handle(Timing, c, v, glue("seconds", elapsed));
         } else {
-            auto result = std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
+            auto result = std::invoke(static_cast<F &&>(f));
             auto const elapsed = std::chrono::duration<double>(Clock::now() - start).count();
-            handle(Timing, {{"seconds", elapsed}});
+            handle(Timing, c, v, glue("seconds", elapsed));
             return result;
         }
     }
 
-    template <class F, class ...Args>
-    auto timing(std::size_t n, F &&f, Args &&...args) {
+    template <class F>
+    double timing(std::size_t n, F &&f, Comment const &c={}, KeyPairs const &v={}) {
         auto const start = Clock::now();
         for (std::size_t i = 0; i != n; ++i)
-            std::invoke(static_cast<F &&>(f), static_cast<Args &&>(args)...);
+            std::invoke(static_cast<F &&>(f));
         auto const elapsed = std::chrono::duration<double>(Clock::now() - start).count();
-        handle(Timing, {{"seconds", elapsed}, {"repeats", n}});
+        handle(Timing, c, v, glue("seconds", elapsed), glue("repeats", n), glue("average", elapsed/n));
         return elapsed;
     }
 
     template <class Bool=bool>
-    bool require(Bool const &ok, KeyPairs const &refs={}) {
+    bool require(Bool const &ok, Comment const &c={}, KeyPairs const &v={}) {
         bool b = static_cast<bool>(unglue(ok));
-        handle(b ? Success : Failure, refs, glue("value", ok));
+        handle(b ? Success : Failure, c, v, glue("value", ok));
         return b;
     }
 
     /******************************************************************************/
 
     template <class L, class R>
-    auto equal(L const &l, R const &r, KeyPairs const &refs={}) {
-        return require_args(unglue(l) == unglue(r), refs, comparison_glue(l, r, "=="));
+    auto equal(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+        return require_args(unglue(l) == unglue(r), c, v, comparison_glue(l, r, Ops::eq));
     }
 
     template <class L, class R>
-    bool not_equal(L const &l, R const &r, KeyPairs const &refs={}) {
-        return require_args(unglue(l) != unglue(r), refs, comparison_glue(l, r, "!="));
+    bool not_equal(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+        return require_args(unglue(l) != unglue(r), c, v, comparison_glue(l, r, Ops::ne));
     }
 
     template <class L, class R>
-    bool less(L const &l, R const &r, KeyPairs const &refs={}) {
-        return require_args(unglue(l) < unglue(r), refs, comparison_glue(l, r, "<"));
+    bool less(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+        return require_args(unglue(l) < unglue(r), c, v, comparison_glue(l, r, Ops::lt));
     }
 
     template <class L, class R>
-    bool greater(L const &l, R const &r, KeyPairs const &refs={}) {
-        return require_args(unglue(l) > unglue(r), refs, comparison_glue(l, r, ">"));
+    bool greater(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+        return require_args(unglue(l) > unglue(r), c, v, comparison_glue(l, r, Ops::gt));
     }
 
     template <class L, class R>
-    bool less_eq(L const &l, R const &r, KeyPairs const &refs={}) {
-        return require_args(unglue(l) <= unglue(r), refs, comparison_glue(l, r, "<="));
+    bool less_eq(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+        return require_args(unglue(l) <= unglue(r), c, v, comparison_glue(l, r, Ops::le));
     }
 
     template <class L, class R>
-    bool greater_eq(L const &l, R const &r, KeyPairs const &refs={}) {
-        return require_args(unglue(l) >= unglue(r), refs, comparison_glue(l, r, ">="));
+    bool greater_eq(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+        return require_args(unglue(l) >= unglue(r), c, v, comparison_glue(l, r, Ops::ge));
     }
 
     template <class T, class L, class R>
-    bool within(T const &tol, L const &l, R const &r, KeyPairs const &refs={}) {
-        ComparisonGlue<L const &, R const &> expr{l, r, "~"};
-        if (l == r) return require_args(true, expr, refs);
-        auto const a = l - r;
-        auto const b = r - l;
-        bool ok = (a < b) ? static_cast<bool>(b < tol) : static_cast<bool>(a < tol);
-        return require_args(ok, refs, expr, glue("tolerance", tol), glue("difference", b));
-    }
-
-    template <class T, class L, class R>
-    bool log_within(T const &tol, L const &l, R const &r, KeyPairs const &refs={}) {
-        ComparisonGlue<L const &, R const &> expr{l, r, "~"};
-        if (l == r) return require_args(true, expr, refs);
-        auto const a = (l - r) / r;
-        auto const b = (r - l) / l;
-        bool ok = (a < b) ? static_cast<bool>(b < tol) : static_cast<bool>(a < tol);
-        return require_args(ok, refs, expr, glue("tolerance", tol), glue("difference", b));
+    bool within(T const &tol, L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+        Within<T> comp{tol};
+        bool ok = comp(unglue(l), unglue(r));
+        return require_args(ok, c, v, comparison_glue(l, r, Ops::near), glue("tolerance", tol), glue("difference", comp.difference));
     }
 
     template <class L, class R>
-    bool near(L const &l, R const &r, KeyPairs const &refs={}) {
-        // std::cout << "hmm " << sizeof...(Args) << std::endl;
-        bool ok = ApproxEquals<typename ApproxType<L, R>::type>()(unglue(l), unglue(r));
-        return require_args(ok, refs, ComparisonGlue<L const &, R const &>{l, r, "~"});
+    bool near(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+        Near<typename NearType<L, R>::type> comp;
+        bool ok = comp(unglue(l), unglue(r));
+        return require_args(ok, c, v, comparison_glue(l, r, Ops::near), glue("difference", comp.difference));
+    }
+
+    template <class T, class L, class R>
+    bool log_within(T const &tol, L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+        LogWithin<T> comp{tol};
+        bool ok = (unglue(l), unglue(r));
+        return require_args(ok, c, v, comparison_glue(l, r, Ops::near), glue("tolerance", tol), glue("relative difference", comp.difference));
     }
 
     template <class Exception, class F>
-    bool throw_as(F &&f, KeyPairs const &refs={}) {
+    bool throw_as(F &&f, Comment const &c={}, KeyPairs const &v={}) {
         try {
             std::invoke(static_cast<F &&>(f));
-            return require_args(false, refs);
-        } catch (Exception const &) {return require_args(true, refs);}
+            return require_args(false, c, v);
+        } catch (Exception const &) {return require_args(true, c, v);}
     }
 
     template <class F>
-    bool no_throw(F &&f, KeyPairs const &refs={}) {
+    bool no_throw(F &&f, Comment const &c={}, KeyPairs const &v={}) {
         try {
             std::invoke(static_cast<F &&>(f));
-            return require_args(true, refs);
+            return require_args(true, c, v);
         } catch (ClientError const &e) {
             throw;
-        } catch (...) {return require_args(false, refs);}
+        } catch (...) {return require_args(false, c, v);}
     }
 
     /**************************************************************************/
 
-    template <class Comp, class L, class R>
-    auto all(char const *op, Comp const &comp, L const &l, R const &r, KeyPairs const &refs={}) {
-        return all_unglued(comp, unglue(l), unglue(r), comparison_glue(l, r, op), refs);
-    }
-
-    template <class L, class R>
-    auto all_equal(L const &l, R const &r, KeyPairs const &refs={}) {
-        return all_unglued(std::equal_to<>(), unglue(l), unglue(r), comparison_glue(l, r, "=="), refs);
-    }
-
-    template <class L, class R>
-    auto all_near(L const &l, R const &r, KeyPairs const &refs={}) {
-        auto const &x2 = unglue(l);
-        auto const &y2 = unglue(r);
-        auto const comp = ApproxEquals<typename ApproxType<std::decay_t<decltype(*begin(x2))>,
-                                                           std::decay_t<decltype(*begin(y2))>>::type>();
-        return all_unglued(comp, unglue(l), unglue(r), comparison_glue(l, r, "~"), refs);
-    }
-
-    template <class Comp, class L, class R, class Glue>
-    auto all_unglued(Comp const &comp, L const &l, R const &r, Glue const &glue, KeyPairs const &refs) {
-        return require_args(std::equal(begin(l), end(l), begin(r), end(r), comp), glue, refs);
+    template <class C, class L, class R>
+    auto all(C const &compare, L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+        return require_args(std::equal(begin(unglue(l)), end(unglue(l)),
+            begin(unglue(r)), end(unglue(r)), compare), c, v, comparison_glue(l, r, compare));
     }
 
     template <class ...Ts>
-    bool require_args(bool ok, KeyPairs const &refs, Ts &&...ts) {
-        handle(ok ? Success : Failure, refs, std::forward<Ts>(ts)...);
+    bool require_args(bool ok, Comment const &c, KeyPairs const &v, Ts &&...ts) {
+        handle(ok ? Success : Failure, c, v, std::forward<Ts>(ts)...);
         return ok;
     }
 };
