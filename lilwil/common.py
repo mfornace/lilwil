@@ -261,8 +261,13 @@ def readable_header(keys, values, kind, scopes):
     '''Return string with basic event information'''
     kind = Event.name(kind) if isinstance(kind, int) else kind
     scopes = repr(DELIMITER.join(scopes))
-    line, path = (pop_value(k, keys, values) for k in ('line', 'file'))
-    if path is None:
+
+    if '__file' in keys:
+        while '__line' in keys:
+            line = pop_value('__line', keys, values)
+        while '__file' in keys:
+            path = pop_value('__file', keys, values)
+    else:
         return '{}: {}\n'.format(kind, scopes)
     desc = '({})'.format(path) if line is None else '({}:{})'.format(path, line)
     return '{}: {} {}\n'.format(kind, scopes, desc)
@@ -272,8 +277,8 @@ def readable_header(keys, values, kind, scopes):
 def readable_logs(keys, values, indent):
     '''Return readable string of key value pairs'''
     s = io.StringIO()
-    while 'comment' in keys: # comments
-        foreach(s.write, indent, 'comment: ', repr(pop_value('comment', keys, values)), '\n')
+    while '__comment' in keys: # comments
+        foreach(s.write, indent, 'comment: ', pop_value('__comment', keys, values), '\n')
 
     comp = ('__lhs', '__op', '__rhs') # comparisons
     while all(map(keys.__contains__, comp)):

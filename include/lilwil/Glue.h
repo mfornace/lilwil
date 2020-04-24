@@ -5,9 +5,15 @@
 
 namespace lilwil {
 
-using KeyPair = std::pair<std::string_view, Value>;
+struct KeyValue {
+    std::string_view key;
+    Value value;
 
-using LogVec = Vector<KeyPair>;
+    template <class V>
+    KeyValue(std::string_view k, V &&v) : key(k), value(std::forward<V>(v)) {}
+};
+
+using KeyValues = Vector<KeyValue>;
 
 /******************************************************************************/
 
@@ -22,9 +28,9 @@ decltype(auto) unglue(T const &t) {return Ungluer<T>()(t);}
 /******************************************************************************/
 
 template <class T, class=void>
-struct AddKeyPairs {
-    void operator()(LogVec &v, T const &t) const {v.emplace_back(KeyPair{{}, t});}
-    void operator()(LogVec &v, T &&t) const {v.emplace_back(KeyPair{{}, std::move(t)});}
+struct AddKeyValue {
+    void operator()(KeyValues &v, T const &t) const {v.emplace_back(std::string_view(), t);}
+    void operator()(KeyValues &v, T &&t) const {v.emplace_back(std::string_view(), std::move(t));}
 };
 
 /******************************************************************************/
@@ -58,45 +64,49 @@ struct Ungluer<Glue<K, V>> {
 };
 
 template <class K, class V>
-struct AddKeyPairs<Glue<K, V>> {
-    void operator()(LogVec &v, Glue<K, V> const &g) const {
-        v.emplace_back(KeyPair{g.key, g.value});
+struct AddKeyValue<Glue<K, V>> {
+    void operator()(KeyValues &v, Glue<K, V> const &g) const {
+        v.emplace_back(KeyValue{g.key, g.value});
     }
 };
 
 /******************************************************************************/
 
-struct FileLine {
-    int line = 0;
+struct SourceLocation {
     std::string_view file;
+    int line = 0;
 };
 
-inline constexpr auto file_line(char const *s, int i) {return FileLine{i, s};}
+inline constexpr auto file_line(char const *s, int i) {return SourceLocation{s, i};}
 
 template <>
-struct AddKeyPairs<FileLine> {
-    void operator()(LogVec &v, FileLine const &g) const {
-        v.emplace_back(KeyPair{"file", g.file});
-        v.emplace_back(KeyPair{"line", static_cast<Integer>(g.line)});
+struct AddKeyValue<SourceLocation> {
+    void operator()(KeyValues &v, SourceLocation const &g) const {
+        v.emplace_back(KeyValue{"__file", g.file});
+        v.emplace_back(KeyValue{"__line", static_cast<Integer>(g.line)});
     }
 };
 
-template <class T>
 struct Comment {
-    T comment;
-    FileLine location;
+    std::string_view comment;
+    SourceLocation location;
+
+    Comment() = default;
+    Comment(std::string_view comment) : comment(comment) {}
+    Comment(char const *comment) : comment(comment) {}
+    Comment(std::string_view comment, std::string_view file, int line) : comment(comment), location{file, line} {}
 };
 
-template <class T>
-Comment<T> comment(T t, char const *s, int i) {return {t, {i, s}};}
+// template <class T>
+// Comment<T> comment(T t, char const *s, int i) {return {t, {i, s}};}
 
-template <class T>
-struct AddKeyPairs<Comment<T>> {
-    void operator()(LogVec &v, Comment<T> const &c) const {
-        AddKeyPairs<FileLine>()(v, c.location);
-        v.emplace_back(KeyPair{"comment", c.comment});
-    }
-};
+// template <class T>
+// struct AddKeyValue<Comment<T>> {
+//     void operator()(KeyValues &v, Comment<T> const &c) const {
+//         AddKeyValue<SourceLocation>()(v, c.location);
+//         v.emplace_back(KeyValue{"__comment", c.comment});
+//     }
+// };
 
 /******************************************************************************/
 
@@ -113,11 +123,11 @@ ComparisonGlue<L const &, R const &> comparison_glue(L const &l, R const &r, cha
 }
 
 template <class L, class R>
-struct AddKeyPairs<ComparisonGlue<L, R>> {
-    void operator()(LogVec &v, ComparisonGlue<L, R> const &t) const {
-        v.emplace_back(KeyPair{"__lhs", t.lhs});
-        v.emplace_back(KeyPair{"__rhs", t.rhs});
-        v.emplace_back(KeyPair{"__op", std::string_view(t.op)});
+struct AddKeyValue<ComparisonGlue<L, R>> {
+    void operator()(KeyValues &v, ComparisonGlue<L, R> const &t) const {
+        v.emplace_back(KeyValue{"__lhs", t.lhs});
+        v.emplace_back(KeyValue{"__rhs", t.rhs});
+        v.emplace_back(KeyValue{"__op", std::string_view(t.op)});
     }
 };
 

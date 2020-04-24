@@ -288,9 +288,10 @@ PyObject *lilwil_finalize(PyObject *, PyObject *) {
 
 // (str, object, object) -> None
 PyObject *lilwil_add_test(PyObject *, PyObject *args) {
-    char const *s;
+    char const *name;
+    char const *comment;
     PyObject *fun, *pypacks = nullptr;
-    if (!PyArg_ParseTuple(args, "sO|O", &s, &fun, &pypacks)) return nullptr;
+    if (!PyArg_ParseTuple(args, "sO|sO", &name, &comment, &fun, &pypacks)) return nullptr;
 
     return lilwil::return_object([=] {
         lilwil::Vector<lilwil::ArgPack> packs;
@@ -301,21 +302,22 @@ PyObject *lilwil_add_test(PyObject *, PyObject *args) {
                 return pack;
             });
         }
-        lilwil::add_test(lilwil::TestCase{s, {}, lilwil::PyTestCase(fun, true), std::move(packs)});
+        lilwil::add_test(lilwil::TestCase(name, lilwil::PyTestCase(fun, true), comment, std::move(packs)));
         return lilwil::Object(Py_None, true);
     });
 }
 
 // (str, object) -> None
 PyObject *lilwil_add_value(PyObject *, PyObject *args) {
-    char const *s;
+    char const *name;
+    char const *comment;
     PyObject *obj;
-    if (!PyArg_ParseTuple(args, "sO", &s, &obj)) return nullptr;
+    if (!PyArg_ParseTuple(args, "sO|s", &name, &obj, &comment)) return nullptr;
 
     return lilwil::return_object([=] {
         lilwil::Value val;
         if (!lilwil::from_python(val, lilwil::Object(obj, true))) return lilwil::Object();
-        lilwil::add_test(lilwil::TestCase{s, {}, lilwil::ValueAdapter{std::move(val)}, {}});
+        lilwil::add_test(lilwil::TestCase(name, lilwil::ValueAdapter{std::move(val)}, comment));
         return lilwil::Object(Py_None, true);
     });
 }
@@ -381,11 +383,11 @@ PyObject *lilwil_test_info(PyObject *self, PyObject *args) {
     if (!c) return nullptr;
     auto n = lilwil::to_python(c->name);
     if (!n) return nullptr;
-    auto f = lilwil::to_python(c->comment.location.file);
+    auto f = lilwil::to_python(c->location.file);
     if (!f) return nullptr;
-    auto l = lilwil::to_python(static_cast<lilwil::Integer>(c->comment.location.line));
+    auto l = lilwil::to_python(static_cast<lilwil::Integer>(c->location.line));
     if (!l) return nullptr;
-    auto o = lilwil::to_python(c->comment.comment);
+    auto o = lilwil::to_python(c->comment);
     if (!o) return nullptr;
     return PyTuple_Pack(4u, +n, +f, +l, +o);
 }

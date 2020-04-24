@@ -1,9 +1,13 @@
 #include <lilwil/Stream.h>
 #include <lilwil/Impl.h>
+
 #include <iostream>
 #include <sstream>
-
+#include <cctype>
+#include <iomanip>
+#include <sstream>
 #include <shared_mutex>
+#include <string_view>
 
 #if !defined(LILWIL_NO_ABI) && __has_include(<cxxabi.h>)
 #   include <cxxabi.h>
@@ -63,11 +67,6 @@ StreamSync cerr_sync{std::cerr, std::cerr.rdbuf()};
 
 /******************************************************************************/
 
-BaseContext::BaseContext(Scopes s, Vector<Handler> h, Vector<Counter> *c, void *m)
-    : scopes(std::move(s)), handlers(std::move(h)), counters(c), start_time(Clock::now()), metadata(m) {}
-
-/******************************************************************************/
-
 std::invalid_argument Value::no_conversion(std::type_info const &dest) const {
     std::ostringstream os;
     if (has_value()) {
@@ -106,16 +105,16 @@ Value call(std::string_view s, Context c, ArgPack pack) {
     });
 }
 
-void add_value(std::string_view s, Value v) {
-    add_test(TestCase{std::string(s), {}, ValueAdapter{std::move(v)}, {}});
+void add_value(std::string_view name, Value v, Comment comment) {
+    add_test(TestCase(name, ValueAdapter{std::move(v)}, comment));
 }
 
-bool set_value(std::string_view s, Value v) {
+bool set_value(std::string_view name, Value v, Comment comment) {
     return write_suite([&](auto &cases) {
-        auto it = std::remove_if(cases.begin(), cases.end(), [s](auto const &c) {return c.name == s;});
+        auto it = std::remove_if(cases.begin(), cases.end(), [name](auto const &c) {return c.name == name;});
         bool erased = (it != cases.end());
         if (erased) cases.erase(it, cases.end());
-        cases.emplace_back(TestCase{std::string(s), {}, ValueAdapter{std::move(v)}, {}});
+        cases.emplace_back(TestCase(name, ValueAdapter{std::move(v)}, comment));
         return erased;
     });
 }
@@ -150,4 +149,24 @@ String address_to_string(void const *p) {
 
 /******************************************************************************/
 
+// String escape from https://gist.github.com/timmi-on-rails/173c496a9c5a33ad9df7c6428b9a077b
+#warning "customize for \ n"
+std::string ToString<std::string>::operator()(std::string s) const {
+    std::stringstream stream;
+
+    stream << std::uppercase << std::hex << std::setfill('0');
+
+    for(char ch : s) {
+        int code = static_cast<unsigned char>(ch);
+
+        if (std::isprint(code)) {
+            stream.put(ch);
+        } else {
+            stream << "\\x" << std::setw(2) << code;
+        }
+    }
+    return stream.str();
+}
+
+/******************************************************************************/
 }
