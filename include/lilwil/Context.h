@@ -59,6 +59,8 @@ struct Base {
     /// Metadata for use by handlers
     void *metadata = nullptr;
 
+    Base() = default;
+
     /// Opens a Context and sets the start_time to the current time
     Base(Scopes scopes, Vector<Handler> handlers, Vector<Counter> *counters=nullptr, void *metadata=nullptr)
         : scopes(std::move(scopes)), handlers(std::move(handlers)),
