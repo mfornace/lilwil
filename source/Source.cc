@@ -1,9 +1,13 @@
 #include <lilwil/Stream.h>
 #include <lilwil/Impl.h>
+
 #include <iostream>
 #include <sstream>
-
+#include <cctype>
+#include <iomanip>
+#include <sstream>
 #include <shared_mutex>
+#include <string_view>
 
 #if !defined(LILWIL_NO_ABI) && __has_include(<cxxabi.h>)
 #   include <cxxabi.h>
@@ -63,11 +67,6 @@ StreamSync cerr_sync{std::cerr, std::cerr.rdbuf()};
 
 /******************************************************************************/
 
-BaseContext::BaseContext(Scopes s, Vector<Handler> h, Vector<Counter> *c, void *m)
-    : scopes(std::move(s)), handlers(std::move(h)), counters(c), start_time(Clock::now()), metadata(m) {}
-
-/******************************************************************************/
-
 std::invalid_argument Value::no_conversion(std::type_info const &dest) const {
     std::ostringstream os;
     if (has_value()) {
@@ -106,16 +105,16 @@ Value call(std::string_view s, Context c, ArgPack pack) {
     });
 }
 
-void add_value(std::string_view s, Value v) {
-    add_test(TestCase{std::string(s), {}, ValueAdapter{std::move(v)}, {}});
+void add_value(std::string_view name, Value v, Comment comment) {
+    add_test(TestCase(name, ValueAdapter{std::move(v)}, comment));
 }
 
-bool set_value(std::string_view s, Value v) {
+bool set_value(std::string_view name, Value v, Comment comment) {
     return write_suite([&](auto &cases) {
-        auto it = std::remove_if(cases.begin(), cases.end(), [s](auto const &c) {return c.name == s;});
+        auto it = std::remove_if(cases.begin(), cases.end(), [name](auto const &c) {return c.name == name;});
         bool erased = (it != cases.end());
         if (erased) cases.erase(it, cases.end());
-        cases.emplace_back(TestCase{std::string(s), {}, ValueAdapter{std::move(v)}, {}});
+        cases.emplace_back(TestCase(name, ValueAdapter{std::move(v)}, comment));
         return erased;
     });
 }
@@ -153,4 +152,64 @@ String address_to_string(void const *p) {
 
 /******************************************************************************/
 
+std::string ToString<Ops>::operator()(Ops s) const {
+    std::string out;
+    switch (s) {
+#ifdef LILWIL_UNICODE
+        case Ops::eq:   {out = "="; break;}
+        case Ops::ne:   {out = u8"\u2260"; break;}
+        case Ops::lt:   {out = "<"; break;}
+        case Ops::gt:   {out = ">"; break;}
+        case Ops::le:   {out = u8"\u2264"; break;}
+        case Ops::ge:   {out = u8"\u2265"; break;}
+        case Ops::near: {out = u8"\u2248"; break;}
+#else
+        case Ops::eq:   {out = "=="; break;}
+        case Ops::ne:   {out = "!="; break;}
+        case Ops::lt:   {out = "<"; break;}
+        case Ops::gt:   {out = ">"; break;}
+        case Ops::le:   {out = "<="; break;}
+        case Ops::ge:   {out = ">="; break;}
+        case Ops::near: {out = "=="; break;}
+#endif
+    }
+    return out;
+}
+
+std::string ToString<std::string_view>::operator()(std::string_view s) const {
+    static constexpr auto hexes = "0123456789ABCDEF";
+
+    std::string out;
+    if (s.size() + 2 < out.capacity()) // avoid going out of SSO
+        out.reserve(s.size() + 16); // can tune this
+
+    out.push_back('"');
+    for (auto c : s) {
+        if (' ' <= c && c <= '~') {
+            out.push_back(c);
+        } else {
+            switch (c) {
+                case '\\': {out += "\\\\"; break;}
+                case '\?': {out += "\\?"; break;}
+                case '\"': {out += "\\\""; break;}
+                case '\a': {out += "\\a"; break;}
+                case '\b': {out += "\\b"; break;}
+                case '\f': {out += "\\f"; break;}
+                case '\n': {out += "\\n"; break;}
+                case '\r': {out += "\\r"; break;}
+                case '\t': {out += "\\t"; break;}
+                case '\v': {out += "\\v"; break;}
+                default: {
+                    out += "\\x";
+                    out.push_back(hexes[c >> 4]);
+                    out.push_back(hexes[c & 0xF]);
+                }
+            }
+        }
+    }
+    out.push_back('"');
+    return out;
+}
+
+/******************************************************************************/
 }

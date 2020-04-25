@@ -39,7 +39,7 @@ template <class T>
 struct ToString<T, std::void_t<decltype(std::declval<std::ostream &>() << std::declval<T const &>())>> {
     std::string operator()(T const &t) const {
         std::ostringstream os;
-        os << t;
+        os << std::boolalpha << t;
         return os.str();
     }
 };
@@ -61,7 +61,7 @@ namespace lilwil {
 
 /******************************************************************************/
 
-auto test1 = unit_test("general-usage", COMMENT("This is a test"), [](lilwil::Context ct) {
+auto test1 = lilwil::unit_test("general-usage", [](lilwil::Context ct) {
     ct("a message");
     int n = ct.section("new-section", [](lilwil::Context ct) {
         ct.equal(3, 4);
@@ -78,12 +78,11 @@ auto test1 = unit_test("general-usage", COMMENT("This is a test"), [](lilwil::Co
 
     auto xxx = 5, yyy = 6;
 
-    ct.equal(xxx, yyy, goo(), "ok...");//, goo(), COMMENT("x should equal y"));
-    ct.equal(xxx, yyy, goo(), COMMENT("x should equal y"));
+    ct.equal(xxx, yyy, "a comment", {{"huh", goo()}, {goo()}});
 
     if (!ct.equal(1, 2)) return std::vector<goo>(2);
     return std::vector<goo>(1);
-});
+}, "This is a test");
 
 UNIT_TEST("looking-at-sizeof", "This is a test 2") = [](lilwil::Context ct) {
     ct(GLUE(sizeof(bool)));
@@ -106,8 +105,8 @@ UNIT_TEST("add-get-value") = [](lilwil::Context ct) {
     ct(HERE).throw_as<std::runtime_error>([]{throw std::runtime_error("runtime_error: uh oh");});
 };
 
-
-auto test2 = lilwil::unit_test("test/with-parameters", COMMENT(), [](lilwil::Context ct, goo const &, int a, std::string b) {
+// doesn't get the source location
+auto test2 = lilwil::unit_test("test/with-parameters", "comment", [](lilwil::Context ct, goo const &, int a, std::string b) {
     // return goo();
     ct(HERE).equal(5, 5);
 }, {{goo(), 1, "ok"}, {goo(), 3, "ok2"}});
@@ -116,9 +115,20 @@ auto test2 = lilwil::unit_test("test/with-parameters", COMMENT(), [](lilwil::Con
 UNIT_TEST("skipped-test/no-parameters") = [](lilwil::Context ct) {
     // return goo();
     ct(HERE).equal(5, 5);
-    ct(HERE).handle(lilwil::Skipped, "this test is skipped");
+    ct(HERE).skipped();
 };
 
+UNIT_TEST("relations") = [](lilwil::Context ct) {
+    ct(HERE).equal(5.0, 5);
+    ct(HERE).not_equal(5.1, 5);
+    ct(HERE).less(4.9, 5);
+    ct(HERE).greater(5.1, 5);
+    ct(HERE).greater_eq(5, 5);
+    ct(HERE).less_eq(4.9, 5);
+    ct(HERE).near(5 + 1e-13, 5);
+    ct(HERE).within(1e-8, 5, 5);
+    ct(HERE).all(std::equal_to<>(), std::vector<int>{1,2,3}, std::vector<int>{1,2,3});
+};
 
 std::shared_timed_mutex mut;
 
@@ -138,40 +148,40 @@ UNIT_TEST("pipeline/2") = [](lilwil::Context ct) {
     ct(HERE,  "check pipeline output").equal(std::get<2>(v), true);
 };
 
-void each(double) {}
+// void each(double) {}
 
-void each(lilwil::KeyPair) {}
+// void each(lilwil::KeyPair) {}
 
-template <class T=lilwil::KeyPair>
-void test_var(T t) {each(t);}
+// template <class T=lilwil::KeyPair>
+// void test_var(T t) {each(t);}
 
-template <class T=lilwil::KeyPair, class U=lilwil::KeyPair>
-void test_var(T t, U u) {each(t); each(u);}
+// template <class T=lilwil::KeyPair, class U=lilwil::KeyPair>
+// void test_var(T t, U u) {each(t); each(u);}
 
 
-template <class ...Ts>
-void test_var2(Ts ...ts) {(each(ts), ...);}
+// template <class ...Ts>
+// void test_var2(Ts ...ts) {(each(ts), ...);}
 
-template <class T=std::initializer_list<lilwil::KeyPair>>
-void test_var2(T t) {for (auto i: t) each(std::move(i));}
+// template <class T=std::initializer_list<lilwil::KeyPair>>
+// void test_var2(T t) {for (auto i: t) each(std::move(i));}
 
-UNIT_TEST("test-5") = [](auto ct) {
-    ct(HERE).equal(5, 5);
-    test_var(6, 5.5);
-    test_var({"hmm", 5.5});
-    test_var({"hmm", 5.5}, {"hmm", 5.5});
-    test_var2({{"hmm", 5.5}, {"hmm", 5.5}});
-    ct(HERE).all_equal(std::string("abc"), std::string("abc"));
-    ct(HERE).all_equal(std::vector<int>{1,2,3}, std::vector<int>{1,2,4});
-    ct(HERE).all_equal(std::vector<int>{1,2,3}, std::vector<int>{1,2,3,3});
-    ct(HERE).all("<", std::less<>(), std::vector<int>{1,2,3}, std::vector<int>{2,5,4});
-};
+// UNIT_TEST("test-5") = [](auto ct) {
+//     ct(HERE).equal(5, 5);
+//     test_var(6, 5.5);
+//     test_var({"hmm", 5.5});
+//     test_var({"hmm", 5.5}, {"hmm", 5.5});
+//     test_var2({{"hmm", 5.5}, {"hmm", 5.5}});
+//     ct(HERE).all_equal(std::string("abc"), std::string("abc"));
+//     ct(HERE).all_equal(std::vector<int>{1,2,3}, std::vector<int>{1,2,4});
+//     ct(HERE).all_equal(std::vector<int>{1,2,3}, std::vector<int>{1,2,3,3});
+//     ct(HERE).all("<", std::less<>(), std::vector<int>{1,2,3}, std::vector<int>{2,5,4});
+// };
 
 UNIT_TEST("mytest/check-something") = [](lilwil::Context ct) {
     // log a single key pair of information before an assertion.
     ct.info("value", 1.5);
 
-    ct("a message", "another message", 10.5); // log some messages
+    ct("a message", "another message with a newline \n and nonprintable \x01", 10.5); // log some messages
 
     ct(GLUE(5 + 5)); // same as ct.info("5 + 5", 10);
 

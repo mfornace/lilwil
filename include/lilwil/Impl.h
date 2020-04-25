@@ -1,9 +1,6 @@
 #pragma once
 #include "Test.h"
 
-namespace lilwil {
-    extern std::function<std::string(std::type_info const &)> type_name;
-}
 
 #ifdef LILWIL_CUSTOM_SUITE
 #    include LILWIL_CUSTOM_SUITE

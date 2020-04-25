@@ -1,13 +1,20 @@
 #pragma once
 #include "Config.h"
 #include "Value.h"
+#include "Approx.h"
 #include <string_view>
 
 namespace lilwil {
 
-using KeyPair = std::pair<std::string_view, Value>;
+struct KeyValue {
+    std::string_view key;
+    Value value;
 
-using LogVec = Vector<KeyPair>;
+    template <class V>
+    KeyValue(std::string_view k, V &&v) : key(k), value(std::forward<V>(v)) {}
+};
+
+using KeyValues = Vector<KeyValue>;
 
 /******************************************************************************/
 
@@ -22,9 +29,9 @@ decltype(auto) unglue(T const &t) {return Ungluer<T>()(t);}
 /******************************************************************************/
 
 template <class T, class=void>
-struct AddKeyPairs {
-    void operator()(LogVec &v, T const &t) const {v.emplace_back(KeyPair{{}, t});}
-    void operator()(LogVec &v, T &&t) const {v.emplace_back(KeyPair{{}, std::move(t)});}
+struct AddKeyValue {
+    void operator()(KeyValues &v, T const &t) const {v.emplace_back(std::string_view(), t);}
+    void operator()(KeyValues &v, T &&t) const {v.emplace_back(std::string_view(), std::move(t));}
 };
 
 /******************************************************************************/
@@ -58,66 +65,88 @@ struct Ungluer<Glue<K, V>> {
 };
 
 template <class K, class V>
-struct AddKeyPairs<Glue<K, V>> {
-    void operator()(LogVec &v, Glue<K, V> const &g) const {
-        v.emplace_back(KeyPair{g.key, g.value});
+struct AddKeyValue<Glue<K, V>> {
+    void operator()(KeyValues &v, Glue<K, V> const &g) const {
+        v.emplace_back(KeyValue{g.key, g.value});
     }
 };
 
 /******************************************************************************/
 
-struct FileLine {
-    int line = 0;
+struct SourceLocation {
     std::string_view file;
+    int line = 0;
 };
 
-inline constexpr auto file_line(char const *s, int i) {return FileLine{i, s};}
+inline constexpr auto file_line(char const *s, int i) {return SourceLocation{s, i};}
 
 template <>
-struct AddKeyPairs<FileLine> {
-    void operator()(LogVec &v, FileLine const &g) const {
-        v.emplace_back(KeyPair{"file", g.file});
-        v.emplace_back(KeyPair{"line", static_cast<Integer>(g.line)});
+struct AddKeyValue<SourceLocation> {
+    void operator()(KeyValues &v, SourceLocation const &g) const {
+        if (!g.file.empty()) {
+            v.emplace_back(KeyValue{"__file", g.file});
+            v.emplace_back(KeyValue{"__line", g.line});
+        }
     }
 };
 
-template <class T>
 struct Comment {
-    T comment;
-    FileLine location;
+    std::string_view comment;
+    SourceLocation location;
+
+    Comment(std::string_view comment, std::string_view file, int line) : comment(comment), location{file, line} {}
+
+    // change these for std::source_location when available
+    Comment() = default;
+    Comment(std::string_view comment) : comment(comment) {}
+    Comment(char const *comment) : comment(comment) {}
 };
 
-template <class T>
-Comment<T> comment(T t, char const *s, int i) {return {t, {i, s}};}
-
-template <class T>
-struct AddKeyPairs<Comment<T>> {
-    void operator()(LogVec &v, Comment<T> const &c) const {
-        AddKeyPairs<FileLine>()(v, c.location);
-        v.emplace_back(KeyPair{"comment", c.comment});
+template <>
+struct AddKeyValue<Comment> {
+    void operator()(KeyValues &v, Comment const &c) const {
+        if (!c.comment.empty()) v.emplace_back(KeyValue{"__comment", c.comment});
+        AddKeyValue<SourceLocation>()(v, c.location);
     }
 };
 
 /******************************************************************************/
+
+enum class Ops {eq, ne, lt, gt, le, ge, near};
+
+template <>
+struct ToString<Ops> {
+    std::string operator()(Ops) const;
+};
+
 
 template <class L, class R>
 struct ComparisonGlue {
-    L lhs;
-    R rhs;
-    char const *op;
+    L left;
+    R right;
+    Ops relation;
 };
 
-template <class L, class R>
-ComparisonGlue<L const &, R const &> comparison_glue(L const &l, R const &r, char const *op) {
-    return {l, r, op};
-}
+constexpr Ops ops_of(Ops o) {return o;}
+
+template <class T> constexpr Ops ops_of(std::equal_to<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(std::not_equal_to<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(std::less<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(std::greater<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(std::greater_equal<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(std::less_equal<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(Near<T>) {return Ops::eq;}
+template <class T> constexpr Ops ops_of(Within<T>) {return Ops::eq;}
+
+template <class L, class R, class T>
+ComparisonGlue<L const &, R const &> comparison_glue(L const &l, R const &r, T const &op) {return {l, r, ops_of(op)};}
 
 template <class L, class R>
-struct AddKeyPairs<ComparisonGlue<L, R>> {
-    void operator()(LogVec &v, ComparisonGlue<L, R> const &t) const {
-        v.emplace_back(KeyPair{"__lhs", t.lhs});
-        v.emplace_back(KeyPair{"__rhs", t.rhs});
-        v.emplace_back(KeyPair{"__op", std::string_view(t.op)});
+struct AddKeyValue<ComparisonGlue<L, R>> {
+    void operator()(KeyValues &v, ComparisonGlue<L, R> const &t) const {
+        v.emplace_back(KeyValue{"__lhs", t.left});
+        v.emplace_back(KeyValue{"__rhs", t.right});
+        v.emplace_back(KeyValue{"__op",  t.relation});
     }
 };
 

@@ -9,8 +9,12 @@ using packs::Signature;
 /******************************************************************************/
 
 struct Skip : std::runtime_error {
-    using std::runtime_error::runtime_error;
-    Skip() : std::runtime_error("Test skipped") {}
+    SourceLocation location;
+
+    Skip(char const *s="Test skipped", SourceLocation const &loc={}) : std::runtime_error(s), location(loc) {}
+    Skip(std::string const &s, SourceLocation const &loc={}) : std::runtime_error(s), location(loc) {}
+
+    Comment as_comment() const & {return Comment(what(), location.file, location.line);}
 };
 
 /******************************************************************************/
@@ -70,17 +74,16 @@ struct TestAdapter {
                 else return value_invoke(function, ct, cast_index(args, ts)...);
             });
         } catch (Skip const &e) {
-            ct.info("reason", e.what());
-            ct.handle(Skipped);
+            ct.handle(Skipped, e.as_comment(), {});
             throw;
         } catch (ClientError const &) {
             throw;
         } catch (std::exception const &e) {
             ct.info("reason", e.what());
-            ct.handle(Exception);
+            ct.handle(Exception, {}, {});
             throw;
         } catch (...) {
-            ct.handle(Exception);
+            ct.handle(Exception, {}, {});
             throw;
         }
     }
@@ -96,36 +99,40 @@ struct ValueAdapter {
 
 /******************************************************************************/
 
-struct TestComment {
-    std::string comment;
-    FileLine location;
-    TestComment() = default;
+// struct TestComment {
+//     std::string comment;
+//     FileLine location;
+//     TestComment() = default;
 
-    template <class T>
-    TestComment(Comment<T> c)
-        : comment(std::move(c.comment)), location(std::move(c.location)) {}
-};
+//     template <class T>
+//     TestComment(Comment<T> c)
+//         : comment(std::move(c.comment)), location(std::move(c.location)) {}
+// };
 
 /// A named, commented, possibly parametrized unit test case
 struct TestCase {
-    std::string name;
-    TestComment comment;
-    std::function<Value(Context &, ArgPack)> function;
+    using Function = std::function<Value(Context &, ArgPack)>;
+    std::string name, comment;
+    Function function;
     Vector<ArgPack> parameters;
+    SourceLocation location;
+
+    TestCase(std::string_view n, Function f, Comment c={}, Vector<ArgPack> p={}):
+        name(n), comment(c.comment), function(std::move(f)), parameters(std::move(p)), location(c.location) {}
 };
 
 
 void add_test(TestCase t);
 
 template <class F>
-void add_raw_test(std::string &&name, TestComment &&c, F const &f, Vector<ArgPack> &&v) {
+void add_raw_test(std::string_view name, F const &f, Comment comment={}, Vector<ArgPack> v={}) {
     // if (TestSignature<F>::size <= 2 && v.empty()) v.emplace_back();
-    add_test(TestCase{std::move(name), std::move(c), TestAdapter<F>{f}, std::move(v)});
+    add_test(TestCase(name, TestAdapter<F>{f}, comment, std::move(v)));
 }
 
 template <class F>
-void add_test(std::string name, TestComment c, F const &f, Vector<ArgPack> v={}) {
-    return add_raw_test(std::move(name), std::move(c), packs::SimplifyFunction<F>()(f), std::move(v));
+void add_test(std::string_view name, F const &f, Comment comment={}, Vector<ArgPack> v={}) {
+    return add_raw_test(name, packs::SimplifyFunction<F>()(f), comment, std::move(v));
 }
 
 /******************************************************************************/
@@ -137,37 +144,34 @@ struct UnitTest {
 };
 
 template <class F>
-UnitTest<F> unit_test(std::string name, F const &f, Vector<ArgPack> v={}) {
-    add_test(name, TestComment(), f, std::move(v));
-    return {std::move(name), f};
+UnitTest<F> unit_test(std::string_view name, F const &fun, Comment comment={}, Vector<ArgPack> v={}) {
+    add_test(name, fun, comment, std::move(v));
+    return {std::string(name), fun};
 }
 
 template <class F>
-UnitTest<F> unit_test(std::string name, TestComment comment, F const &f, Vector<ArgPack> v={}) {
-    add_test(name, std::move(comment), f, std::move(v));
-    return {std::move(name), f};
+UnitTest<F> unit_test(std::string_view name, Comment comment, F const &fun, Vector<ArgPack> v={}) {
+    add_test(name, fun, comment, std::move(v));
+    return {std::string(name), fun};
 }
 
 /******************************************************************************/
 
 /// Same as unit_test() but just returns a meaningless bool instead of a functor object
 template <class F>
-bool anonymous_test(std::string name, TestComment comment, F &&function, Vector<ArgPack> v={}) {
-    add_test(std::move(name), std::move(comment), static_cast<F &&>(function), std::move(v));
+bool anonymous_test(std::string_view name, F const &fun, Comment comment={}, Vector<ArgPack> v={}) {
+    add_test(name, fun, comment, std::move(v));
     return bool();
 }
 
 /// Helper class for UNIT_TEST() macro, overloads the = operator to make it a bit prettier.
 struct AnonymousClosure {
-    std::string name;
-    TestComment comment;
-
-    AnonymousClosure(std::string s, TestComment c)
-        : name(std::move(s)), comment(std::move(c)) {}
+    std::string_view name, comment, file;
+    int line;
 
     template <class F>
     constexpr bool operator=(F const &f) && {
-        return anonymous_test(std::move(name), std::move(comment), f);
+        return anonymous_test(name, f, Comment(comment, file, line));
     }
 };
 
@@ -191,10 +195,10 @@ Value get_value(std::string_view key, bool allow_missing=false);
 
 /// Set a value, removing any prior test cases that had the same key
 /// - return whether prior test cases were removed
-bool set_value(std::string_view key, Value v);
+bool set_value(std::string_view key, Value value, Comment comment={});
 
 /// Add a value to the test suite
-void add_value(std::string_view key, Value v);
+void add_value(std::string_view key, Value value, Comment comment={});
 
 /******************************************************************************/
 

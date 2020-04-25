@@ -100,10 +100,10 @@ Object to_python(T const &v) noexcept {
     // return std::visit([](auto const &x) {return to_python(x);}, s.var);
 }
 
-Object to_python(KeyPair const &p) noexcept {
-    Object key = to_python(p.first);
+Object to_python(KeyString const &p) noexcept {
+    Object key = to_python(p.key);
     if (!key) return {};
-    Object value = to_python(p.second);
+    Object value = to_python(p.value);
     if (!value) return {};
     return {PyTuple_Pack(2u, +key, +value), false};
 }
@@ -155,7 +155,7 @@ struct PyHandler {
     Object object;
     ReleaseGIL *unlock = nullptr;
 
-    bool operator()(Event event, Scopes const &scopes, LogVec const &logs) {
+    bool operator()(Event event, Scopes const &scopes, KeyStrings const logs) {
         if (!+object) return false;
         AcquireGIL lk(unlock); // reacquire the GIL (if it was released)
         Object pyevent = to_python(static_cast<Integer>(event.index));
