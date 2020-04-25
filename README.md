@@ -484,7 +484,7 @@ There are quite a number of CLI options, which was easy to write using Python's 
 ./test.py -0e # show no event by default (0), then turn on only exceptions (e)
 ./test.py "test-name" # run a given test
 ./test.py -r "test-name/.*" # run tests matching a given regex
-./test.py "test-name" -p "[0, 1, 'aaa']" # run a test with parameters specified as a Python string
+./test.py "test-name" -a "(0, 1, 'aaa')" # run a test with parameters specified as a Python string
 ```
 
 There are a few other reporters written in the Python package, including writing to JUnit XML, a simple JSON format, and streaming TeamCity directives. In general, command line options which expect an output file path ca take `stderr` and `stdout` as special values which signify that the respective streams should be used.

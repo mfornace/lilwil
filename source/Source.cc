@@ -127,10 +127,13 @@ Value get_value(std::string_view s, bool allow_missing) {
             if (allow_missing) return {};
             throw std::out_of_range("Test case \"" + std::string(s) + "\" not found");
         }
-        ValueAdapter const *p = it->function.template target<ValueAdapter>();
-        if (p) return p->value;
-        if (allow_missing) return {};
-        throw std::out_of_range("Test case \"" + std::string(s) + "\" is not a simple value");
+        // 1. Check for invalid test case, should not happen
+        if (!it->function) throw std::runtime_error("Test case \"" + std::string(s) + "\" is invalid");
+        // 2. It just holds a constant Value
+        if (auto p = it->function.template target<ValueAdapter>()) return p->value;
+        // 3. Invoke with an empty Context
+        Context ct;
+        return it->function(ct, ArgPack());
     });
 }
 

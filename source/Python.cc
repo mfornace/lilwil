@@ -6,6 +6,10 @@
 #include <optional>
 #include <vector>
 
+#if __has_include(<filesystem>)
+#    include <filesystem>
+#endif
+
 namespace lilwil {
 
 /******************************************************************************/
@@ -250,6 +254,20 @@ PyObject * return_object(F &&f) noexcept {
 
 /******************************************************************************/
 
+Object simplify_file_path(std::string_view s) noexcept {
+#   if __has_include(<filesystem>)
+        if (!s.empty()) {
+            try {
+                std::error_code ec;
+                auto p = std::filesystem::proximate(s, ec);
+                if (!ec) return lilwil::to_python(p.native());
+            } catch (...) {} // bad_alloc
+        }
+#   endif
+    return lilwil::to_python(s);
+}
+
+
 }
 
 extern "C" {
@@ -381,7 +399,7 @@ PyObject *lilwil_test_info(PyObject *self, PyObject *args) {
     if (!c) return nullptr;
     auto n = lilwil::to_python(c->name);
     if (!n) return nullptr;
-    auto f = lilwil::to_python(c->comment.location.file);
+    auto f = lilwil::simplify_file_path(c->comment.location.file);
     if (!f) return nullptr;
     auto l = lilwil::to_python(static_cast<lilwil::Integer>(c->comment.location.line));
     if (!l) return nullptr;
