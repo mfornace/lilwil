@@ -284,6 +284,8 @@ struct Context : BaseContext {
 
     template <class C, class L, class R>
     auto all(C const &compare, L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+        using std::begin;
+        using std::end;
         return require_args(std::equal(begin(unglue(l)), end(unglue(l)),
             begin(unglue(r)), end(unglue(r)), compare), c, v, comparison_glue(l, r, compare));
     }
