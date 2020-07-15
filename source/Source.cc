@@ -180,24 +180,28 @@ std::string ToString<std::string_view>::operator()(std::string_view s) const {
     static constexpr auto hexes = "0123456789ABCDEF";
 
     std::string out;
-    if (s.size() + 2 < out.capacity()) // avoid going out of SSO
-        out.reserve(s.size() + 16); // can tune this
+    if (s.size() > out.capacity()) // only reserve for expected non-SSO
+        out.reserve(s.size() + 8); // make some space for escapes, this is tunable
 
-    out.push_back('"');
+    // out.push_back('"');
     for (auto c : s) {
         if (' ' <= c && c <= '~') {
             out.push_back(c);
         } else {
             switch (c) {
-                case '\\': {out += "\\\\"; break;}
+                case '\\': {out.push_back(c); break;}
+                // case '\\': {out += "\\\\"; break;}
                 case '\?': {out += "\\?"; break;}
-                case '\"': {out += "\\\""; break;}
+                // case '\"': {out += "\\\""; break;}
+                case '\"': {out.push_back(c); break;}
                 case '\a': {out += "\\a"; break;}
                 case '\b': {out += "\\b"; break;}
                 case '\f': {out += "\\f"; break;}
-                case '\n': {out += "\\n"; break;}
+                // case '\n': {out += "\\n"; break;}
+                case '\n': {out.push_back(c); break;}
                 case '\r': {out += "\\r"; break;}
-                case '\t': {out += "\\t"; break;}
+                //case '\t': {out += "\\t"; break;}
+                case '\t': {out.push_back(c); break;}
                 case '\v': {out += "\\v"; break;}
                 default: {
                     out += "\\x";
@@ -207,7 +211,7 @@ std::string ToString<std::string_view>::operator()(std::string_view s) const {
             }
         }
     }
-    out.push_back('"');
+    // out.push_back('"');
     return out;
 }
 

@@ -4,7 +4,6 @@
 #include <any>
 #include <string>
 #include <stdexcept>
-#include <sstream>
 
 namespace lilwil {
 
@@ -13,8 +12,14 @@ extern std::function<std::string(std::type_info const &)> type_name;
 /******************************************************************************/
 
 template <class T, class SFINAE=void>
-struct ToString {
-    std::string operator()(T const &t) const {return "<" + type_name(typeid(T)) + ">";}
+struct ToString : std::false_type {
+    std::string operator()(T const &t) const {
+        if constexpr (std::is_integral_v<T>) {
+            return std::to_string(t);
+        } else {
+            return "<" + type_name(typeid(T)) + ">";
+        }
+    }
 };
 
 /******************************************************************************/
@@ -203,6 +208,7 @@ struct ToString<std::string> {
     std::string operator()(std::string s) const {return ToString<std::string_view>()(s);}
 };
 
+#warning "no default print for doubles..."
 
 // void * is also included to avoid issues with specializing pointer types
 // i.e. if you specialize T * to print the dereferenced value, you'll get issues

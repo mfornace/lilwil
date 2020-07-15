@@ -5,12 +5,49 @@
 #include <iostream>
 #include <optional>
 #include <vector>
+#include <sstream>
 
 #if __has_include(<filesystem>)
 #    include <filesystem>
 #endif
 
 namespace lilwil {
+
+template <class T>
+struct ToString<T, void> {
+    std::string operator()(T const &t) const {
+        std::stringstream ss;
+        ss << t;
+        return std::move(ss).str();
+    }
+};
+
+template <>
+struct ToString<Binary> {
+    std::string operator()(Binary const &t) const {
+        std::stringstream ss;
+        ss << std::hex << "0x";
+        for (auto b : t) ss << b;
+        return std::move(ss).str();
+    }
+};
+
+template <>
+struct ToString<ArrayView> {
+    std::string operator()(ArrayView const &t) const {
+        std::stringstream ss;
+        ss << "lilwil::ArrayView(" << type_name(t.type());
+        for (auto i : t.shape()) ss << ", " << i;
+        ss << ")";
+        return std::move(ss).str();
+    }
+};
+
+
+template <>
+struct ToString<JSON> {
+    std::string operator()(JSON const &t) const {return t.content;}
+};
 
 /******************************************************************************/
 
