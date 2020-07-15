@@ -69,16 +69,24 @@ def run_suite(lib, keypairs, masks, gil, cout, cerr, exe=map):
     '''Run a subset of tests'''
     out, err = StringIO(), StringIO()
     f = partial(run_index, lib, masks, out, err, gil, cout, cerr)
-    try:
-        n, time, *counts = tuple(map(sum, zip(*exe(f, keypairs)))) or (0,) * (len(Event) + 2)
-    except KeyboardInterrupt: # prettify the report of this error type
-        n = None
 
-    if n is None:
-        raise KeyboardInterrupt('Test suite was interrupted while running')
+    output = [0] * (len(Event) + 2)
+    try:
+        for result in exe(f, keypairs):
+            output = [(o + r) for o, r in zip(output, result)]
+        interrupt = False
+    except KeyboardInterrupt: # prettify the report of this error type
+        interrupt = True
+
+    n, time, *counts = output
 
     for r, _ in masks:
         r.finalize(n, time, counts, out.getvalue(), err.getvalue())
+
+    if interrupt:
+        import sys
+        print('Test suite was interrupted while running')
+        sys.exit(1)
 
     return (n, time, *counts)
 
