@@ -94,14 +94,16 @@ Object to_python(T const &v) noexcept {
     if (auto p = v.template target<std::wstring_view>()) return to_python(*p);
     if (auto p = v.template target<char const *>()) return to_python(*p);
     if (auto p = v.template target<Integer>()) return to_python(*p);
-    return to_python(v.to_string());
+    auto s = v.to_string();
+    if (s.empty()) s = "Value(" + type_name(v.any().type()) + ")";
+    return to_python(std::move(s));
     // return std::visit([](auto const &x) {return to_python(x);}, s.var);
 }
 
-Object to_python(KeyPair const &p) noexcept {
-    Object key = to_python(p.first);
+Object to_python(KeyString const &p) noexcept {
+    Object key = to_python(p.key);
     if (!key) return {};
-    Object value = to_python(p.second);
+    Object value = to_python(p.value);
     if (!value) return {};
     return {PyTuple_Pack(2u, +key, +value), false};
 }
@@ -153,7 +155,7 @@ struct PyHandler {
     Object object;
     ReleaseGIL *unlock = nullptr;
 
-    bool operator()(Event event, Scopes const &scopes, LogVec const &logs) {
+    bool operator()(Event event, Scopes const &scopes, KeyStrings const logs) {
         if (!+object) return false;
         AcquireGIL lk(unlock); // reacquire the GIL (if it was released)
         Object pyevent = to_python(static_cast<Integer>(event.index));

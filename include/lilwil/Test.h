@@ -8,11 +8,13 @@ using packs::Signature;
 
 /******************************************************************************/
 
-/// No need to inherit from std::exception since the use case is so limited, I think.
-struct Skip {
-    std::string_view message;
-    Skip() noexcept : message("Test skipped") {}
-    explicit Skip(std::string_view const &m) noexcept : message(m) {}
+struct Skip : std::runtime_error {
+    SourceLocation location;
+
+    Skip(char const *s="Test skipped", SourceLocation const &loc={}) : std::runtime_error(s), location(loc) {}
+    Skip(std::string const &s, SourceLocation const &loc={}) : std::runtime_error(s), location(loc) {}
+
+    Comment as_comment() const & {return Comment(what(), location.file, location.line);}
 };
 
 /******************************************************************************/
@@ -33,21 +35,24 @@ struct TestSignature<F, std::void_t<typename Signature<F>::return_type>> : Signa
 /******************************************************************************/
 
 template <class F, class ...Ts>
-Value value_invoke(F const &f, Context &c, Ts &&... ts) {
-    using R = std::remove_cv_t<std::invoke_result_t<F, Context &, Ts...>>;
+Value value_invoke(F const &f, Ts &&... ts) {
+    using R = std::remove_cv_t<std::invoke_result_t<F, Ts...>>;
     if constexpr(std::is_same_v<void, R>)
-        return std::invoke(f, c, static_cast<Ts &&>(ts)...), Value();
-    else return std::invoke(f, c, static_cast<Ts &&>(ts)...);
+        return std::invoke(f, static_cast<Ts &&>(ts)...), Value();
+    else return std::invoke(f, static_cast<Ts &&>(ts)...);
 }
 
 template <class T>
 std::decay_t<T> cast_index(ArgPack const &v, packs::IndexedType<T> i) {
     static_assert(std::is_convertible_v<std::decay_t<T>, T>);
-    return v[i.index].template convert<std::decay_t<T>>();
+    return v[i.index].template view_as<std::decay_t<T>>();
 }
 
 template <class R, class C, class ...Ts>
 Pack<Ts...> skip_first_two(Pack<R, C, Ts...>);
+
+template <class R>
+Pack<> skip_first_two(Pack<R>);
 
 /******************************************************************************/
 
@@ -63,22 +68,22 @@ struct TestAdapter {
     Value operator()(Context &ct, ArgPack args) {
         try {
             if (args.size() != Sig::size)
-                throw std::runtime_error(wrong_number_string(Sig::size, args.size()));
+                throw Skip(wrong_number_string(Sig::size, args.size()));
             return Sig::indexed([&](auto ...ts) {
-                return value_invoke(function, ct, cast_index(args, ts)...);
+                if constexpr(TestSignature<F>::size == 1) return value_invoke(function);
+                else return value_invoke(function, ct, cast_index(args, ts)...);
             });
         } catch (Skip const &e) {
-            ct.info("value", e.message);
-            ct.handle(Skipped);
+            ct.handle(Skipped, e.as_comment(), {});
             throw;
         } catch (ClientError const &) {
             throw;
         } catch (std::exception const &e) {
-            ct.info("value", e.what());
-            ct.handle(Exception);
+            ct.info("reason", e.what());
+            ct.handle(Exception, {}, {});
             throw;
         } catch (...) {
-            ct.handle(Exception);
+            ct.handle(Exception, {}, {});
             throw;
         }
     }
@@ -86,7 +91,7 @@ struct TestAdapter {
 
 /******************************************************************************/
 
-/// Basic wrapper to make a fixed Variable into a std::function
+/// Basic wrapper to make a fixed Value into a std::function
 struct ValueAdapter {
     Value value;
     Value operator()(Context &, ArgPack const &) const {return value;}
@@ -94,36 +99,40 @@ struct ValueAdapter {
 
 /******************************************************************************/
 
-struct TestCaseComment {
-    std::string comment;
-    FileLine location;
-    TestCaseComment() = default;
+// struct TestComment {
+//     std::string comment;
+//     FileLine location;
+//     TestComment() = default;
 
-    template <class T>
-    TestCaseComment(Comment<T> c)
-        : comment(std::move(c.comment)), location(std::move(c.location)) {}
-};
+//     template <class T>
+//     TestComment(Comment<T> c)
+//         : comment(std::move(c.comment)), location(std::move(c.location)) {}
+// };
 
 /// A named, commented, possibly parametrized unit test case
 struct TestCase {
-    std::string name;
-    TestCaseComment comment;
-    std::function<Value(Context &, ArgPack)> function;
+    using Function = std::function<Value(Context &, ArgPack)>;
+    std::string name, comment;
+    Function function;
     Vector<ArgPack> parameters;
+    SourceLocation location;
+
+    TestCase(std::string_view n, Function f, Comment c={}, Vector<ArgPack> p={}):
+        name(n), comment(c.comment), function(std::move(f)), parameters(std::move(p)), location(c.location) {}
 };
 
 
 void add_test(TestCase t);
 
 template <class F>
-void add_raw_test(std::string &&name, TestCaseComment &&c, F const &f, Vector<ArgPack> &&v) {
-    if (TestSignature<F>::size <= 2 && v.empty()) v.emplace_back();
-    add_test(TestCase{std::move(name), std::move(c), TestAdapter<F>{f}, std::move(v)});
+void add_raw_test(std::string_view name, F const &f, Comment comment={}, Vector<ArgPack> v={}) {
+    // if (TestSignature<F>::size <= 2 && v.empty()) v.emplace_back();
+    add_test(TestCase(name, TestAdapter<F>{f}, comment, std::move(v)));
 }
 
 template <class F>
-void add_test(std::string name, TestCaseComment c, F const &f, Vector<ArgPack> v={}) {
-    return add_raw_test(std::move(name), std::move(c), packs::SimplifyFunction<F>()(f), std::move(v));
+void add_test(std::string_view name, F const &f, Comment comment={}, Vector<ArgPack> v={}) {
+    return add_raw_test(name, packs::SimplifyFunction<F>()(f), comment, std::move(v));
 }
 
 /******************************************************************************/
@@ -135,44 +144,41 @@ struct UnitTest {
 };
 
 template <class F>
-UnitTest<F> unit_test(std::string name, F const &f, Vector<ArgPack> v={}) {
-    add_test(name, TestCaseComment(), f, std::move(v));
-    return {std::move(name), f};
+UnitTest<F> unit_test(std::string_view name, F const &fun, Comment comment={}, Vector<ArgPack> v={}) {
+    add_test(name, fun, comment, std::move(v));
+    return {std::string(name), fun};
 }
 
 template <class F>
-UnitTest<F> unit_test(std::string name, TestCaseComment comment, F const &f, Vector<ArgPack> v={}) {
-    add_test(name, std::move(comment), f, std::move(v));
-    return {std::move(name), f};
+UnitTest<F> unit_test(std::string_view name, Comment comment, F const &fun, Vector<ArgPack> v={}) {
+    add_test(name, fun, comment, std::move(v));
+    return {std::string(name), fun};
 }
 
 /******************************************************************************/
 
 /// Same as unit_test() but just returns a meaningless bool instead of a functor object
 template <class F>
-bool anonymous_test(std::string name, TestCaseComment comment, F &&function, Vector<ArgPack> v={}) {
-    add_test(std::move(name), std::move(comment), static_cast<F &&>(function), std::move(v));
+bool anonymous_test(std::string_view name, F const &fun, Comment comment={}, Vector<ArgPack> v={}) {
+    add_test(name, fun, comment, std::move(v));
     return bool();
 }
 
 /// Helper class for UNIT_TEST() macro, overloads the = operator to make it a bit prettier.
 struct AnonymousClosure {
-    std::string name;
-    TestCaseComment comment;
-
-    AnonymousClosure(std::string s, TestCaseComment c)
-        : name(std::move(s)), comment(std::move(c)) {}
+    std::string_view name, comment, file;
+    int line;
 
     template <class F>
     constexpr bool operator=(F const &f) && {
-        return anonymous_test(std::move(name), std::move(comment), f);
+        return anonymous_test(name, f, Comment(comment, file, line));
     }
 };
 
 /******************************************************************************/
 
 /// Call a registered unit test with type-erased arguments and output
-/// Throw std::runtime_error if test not found or test throws exception
+/// Throw std::out_of_range if test not found or test throws exception
 Value call(std::string_view s, Context c, ArgPack pack);
 
 /// Call a registered unit test with non-type-erased arguments and output
@@ -182,8 +188,17 @@ Value call(std::string_view s, Context c, Ts &&...ts) {
 }
 
 /// Get a stored value from its unit test name
-/// Throw std::runtime_error if test not found or test does not hold a Value
-Value get_value(std::string_view s);
+/// If test not found or test does not hold a Value:
+/// - allow_missing == false: throws std::out_of_range
+/// - allow_missing == true: returns an empty Value
+Value get_value(std::string_view key, bool allow_missing=false);
+
+/// Set a value, removing any prior test cases that had the same key
+/// - return whether prior test cases were removed
+bool set_value(std::string_view key, Value value, Comment comment={});
+
+/// Add a value to the test suite
+void add_value(std::string_view key, Value value, Comment comment={});
 
 /******************************************************************************/
 

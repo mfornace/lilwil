@@ -1,4 +1,5 @@
-import sys, io, enum, typing
+import os, json, sys, io, enum, typing, importlib
+from collections import defaultdict
 
 try:
     from contextlib import ExitStack
@@ -14,9 +15,6 @@ except NameError: # Python 2
 
 # Change this if you want a different scope delimiter for display purposes
 DELIMITER = '/'
-
-# Change this global if you can't use Unicode or you don't like it
-TRANSLATE = {'~': u'\u2248'}
 
 class Event(enum.IntEnum):
     '''Enum mirroring the libwil C++ one'''
@@ -39,6 +37,7 @@ Event.names = ('Failure', 'Success', 'Exception', 'Timing', 'Skipped')
 ################################################################################
 
 def foreach(function, *args):
+    '''Run function on each positional argument in sequence'''
     return tuple(map(function, args))
 
 ################################################################################
@@ -73,7 +72,6 @@ def import_library(lib, name=None):
     By default, look for a module with the same name as the file it's in.
     If that fails and :name is given, look for a module of :name instead.
     '''
-    import os, importlib
     sys.path.insert(0, os.path.dirname(os.path.abspath(lib)))
     try:
         return importlib.import_module(lib)
@@ -98,21 +96,6 @@ def open_file(stack, name, mode):
         return getattr(sys, name)
     else:
         return stack.enter_context(open(name, mode))
-
-################################################################################
-
-def load_parameters(params):
-    '''load parameters from None, eval-able str, JSON file name, or dict-like'''
-    if not params:
-        return {}
-    elif not isinstance(params, str):
-        return dict(params)
-    try:
-        with open(params) as f:
-            import json
-            return dict(json.load(f))
-    except FileError:
-        return eval(params)
 
 ################################################################################
 
@@ -142,33 +125,86 @@ def test_indices(names, exclude=False, tests=None, regex='', strict=False):
         out = set(range(len(names))).difference(out)
     return sorted(out)
 
+
 ################################################################################
 
-def parametrized_indices(lib, indices, params=(None,), default=(None,)):
+# Modify this global list as needed
+EVAL_MODULES = ['csv', 'json', 'os', 'numpy', 'pandas']
+
+def nice_eval(string, modules=None):
     '''
-    Yield tuple of (index, parameter_pack) for each test to run
-        lib: the lilwil library object
-        indices: the possible indices to yield from
-        params: dict or list of specified parameters (e.g. from load_parameters())
-    If params is not dict-like, it is assumed to give the default parameters for all tests.
-    A valid argument list is either:
-        a tuple of arguments
-        an index to preregistered arguments
-        None, meaning all preregistered arguments
+    Run eval() on a user's specified string
+    For convenience, give them access to the whitelisted modules
+    '''
+    if not isinstance(string, str):
+        return string
+
+    mods = {}
+    for m in EVAL_MODULES if modules is None else modules:
+        if m not in string:
+            continue
+        try:
+            mods[m] = importlib.import_module(m)
+        except ImportError:
+            pass
+
+    return eval(string, mods)
+
+def load_parameters(args, params):
+    ''' load parameters from one of:
+    - None
+    - dict-like
+    - JSON file name
+    - eval-able str
+    '''
+    args = tuple(nice_eval(p) for p in args or ())
+    out = defaultdict(lambda: args)
+    for p in params or ():
+        with open(p) as f:
+            out.update(json.load(f))
+    return out
+
+################################################################################
+
+def parametrized_indices(lib, indices, params=(None,)):
+    '''
+    Yield tuple of (index, parameter_pack) for each test/parameter combination to run
+    - lib: the lilwil library object
+    - indices: the possible indices to yield from
+    - params: dict or list of specified parameters (e.g. from load_parameters())
+
+    If params is dict-like, it should map from test name to a list of parameter packs
+
+    If params is list-like, it is assumed to be the list of parameter packs for all tests
+
+    A parameter pack is either
+    - a tuple of arguments
+    - an index to a preregistered argument pack
+    - None, meaning all preregistered arguments
     '''
     names = lib.test_names()
-    if not hasattr(params, 'get'):
-        params, default = {}, params
     for i in indices:
-        ps = list(params.get(names[i], default))
+        try:
+            ps = list(params[names[i]])
+        except KeyError:
+            continue
+
         n = lib.n_parameters(i)
+
+        # replace None with all of the prespecified indices
         while None in ps:
             ps.remove(None)
             ps.extend(range(n))
+
+        # add a single empty argument pack if none exists
+        if not ps:
+            ps.append(tuple())
+
+        # yield each parameter pack for this test
         for p in ps:
-            if isinstance(p, int) and p >= n:
-                raise IndexError("Parameter pack index {} is out of range for test '{}' (n={})".format(p, names[i], n))
-            yield i, p
+            if not isinstance(p, int) or p < n:
+                # raise IndexError("Parameter pack index {} is out of range for test '{}' (n={})".format(p, names[i], n))
+                yield i, p
 
 ################################################################################
 
@@ -222,8 +258,13 @@ def readable_header(keys, values, kind, scopes):
     '''Return string with basic event information'''
     kind = Event.name(kind) if isinstance(kind, int) else kind
     scopes = repr(DELIMITER.join(scopes))
-    line, path = (pop_value(k, keys, values) for k in ('line', 'file'))
-    if path is None:
+
+    if '__file' in keys:
+        while '__line' in keys:
+            line = pop_value('__line', keys, values)
+        while '__file' in keys:
+            path = pop_value('__file', keys, values)
+    else:
         return '{}: {}\n'.format(kind, scopes)
     desc = '({})'.format(path) if line is None else '({}:{})'.format(path, line)
     return '{}: {} {}\n'.format(kind, scopes, desc)
@@ -233,13 +274,13 @@ def readable_header(keys, values, kind, scopes):
 def readable_logs(keys, values, indent):
     '''Return readable string of key value pairs'''
     s = io.StringIO()
-    while 'comment' in keys: # comments
-        foreach(s.write, indent, 'comment: ', repr(pop_value('__comment', keys, values)), '\n')
+    while '__comment' in keys: # comments
+        foreach(s.write, indent, 'comment: ', pop_value('__comment', keys, values), '\n')
 
     comp = ('__lhs', '__op', '__rhs') # comparisons
     while all(map(keys.__contains__, comp)):
         lhs, op, rhs = (pop_value(k, keys, values) for k in comp)
-        foreach(s.write, indent, 'required: {} {} {}\n'.format(lhs, TRANSLATE.get(op, op), rhs))
+        foreach(s.write, indent, 'required: {} {} {}\n'.format(lhs, op, rhs))
 
     for k, v in zip(keys, values): # all other logged keys and values
         foreach(s.write, indent, (k + ': ' if k else 'info: '), str(v), '\n')

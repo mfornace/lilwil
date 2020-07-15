@@ -23,8 +23,8 @@ class Colorer:
         self.colored = colored if colors else not_colored
         self.stream_footer = '' if brief else '_' * 22 + '\n'
         self.footer = '' if brief else '_' * 80 + '\n'
-        self.stderr = self.colored('Contents of std::err', 'magenta')
-        self.stdout = self.colored('Contents of std::out', 'magenta')
+        self.stderr = self.colored('Contents of std::cerr', 'magenta')
+        self.stdout = self.colored('Contents of std::cout', 'magenta')
         self.test_duration = self.colored('Test duration', 'yellow')
         self.total_duration = self.colored('Total duration', 'yellow')
 
@@ -83,10 +83,19 @@ class ConsoleTestReport(Report):
             self.file, self.output = file, None
 
         if info[1]:
-            info = repr(info[0]) + ' (%s:%d) ' % info[1:3] + (repr(info[3]) if info[3] else '')
+            if args:
+                s = '%r (%s:%d, args: %s) ' % (*info[:3], list(args))
+            else:
+                s = '%r (%s:%d) ' % info[:3]
+            if info[3]:
+                s += repr(info[3])
         else:
-            info = repr(info[0])
-        self.write(self.color.footer, self.color.test_name(index), info, '\n')
+            if args:
+                s = '%r (args: %s)' % (info[0], list(args))
+            else:
+                s = repr(info[0])
+
+        self.write(self.color.footer, self.color.test_name(index), s, '\n')
 
     def write(self, *args):
         tuple(map(self.file.write, args))

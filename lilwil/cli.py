@@ -1,4 +1,4 @@
-import typing
+import typing, sys
 from io import StringIO
 from functools import partial
 
@@ -21,14 +21,15 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
 
     p = ArgumentParser(prog=prog, description=description, **kwargs)
     s(p, '--list',               '-l', help='list all test names')
-    o(p, str, 'PATH', '--lib',   '-a', help='file path for test library (default %s)' % repr(lib), default=str(lib))
+    o(p, str, 'PATH', '--lib',   '-L', help='file path for test library (default %s)' % repr(lib), default=str(lib))
     o(p, int, 'INT', '--jobs',   '-j', help='# of threads (default %d; 0 to use only main thread)' % jobs, default=jobs)
-    o(p, str, 'STR', '--params', '-p', help='JSON file path or Python eval-able parameter string')
     o(p, str, 'RE',  '--regex',  '-r', help="specify tests with names matching a given regex")
     s(p, '--exclude',            '-x', help='exclude rather than include specified cases')
     s(p, '--capture',            '-c', help='capture std::cerr and std::cout')
+    o(p, str, 'STR', '--args',   '-a', action='append', help='int or Python tuple expression for a parameter pack to apply to each test (may be specified multiple times)')
+    o(p, str, 'STR', '--params', '-p', action='append', help='JSON file for all parameters (in {"name": [packs...], ...} form; may be specified multiple times)')
     s(p, '--gil',                '-g', help='keep Python global interpeter lock on')
-    o(p, str, '', 'tests', nargs='*',  help='test names (if not given, specifies all tests)')
+    o(p, str, '', 'tests', nargs='*',  help='test names (if not given, specifies all tests that can be run without any user-specified parameters)')
 
     r = p.add_argument_group('reporter options')
     o(r, str, 'PATH', '--xml',         help='XML file path')
@@ -40,12 +41,13 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
 
     t = p.add_argument_group('console output options')
     s(t, '--quiet',            '-q', help='prevent command line output (at least from Python)')
-    s(t, '--failure',          '-f', help='show failures')
-    s(t, '--success',          '-s', help='show successes')
-    s(t, '--exception',        '-e', help='show exceptions')
-    s(t, '--timing',           '-t', help='show timings')
-    s(t, '--skip',             '-k', help='show skipped tests')
-    s(t, '--brief',            '-b', help='abbreviate output')
+    s(t, '--no-default',       '-0', help='do not show outputs by default')
+    s(t, '--failure',          '-f', help='show outputs for failure events (on by default)')
+    s(t, '--success',          '-s', help='show outputs for success events (off by default)')
+    s(t, '--exception',        '-e', help='show outputs for exception events (on by default)')
+    s(t, '--timing',           '-t', help='show outputs for timing events (on by default)')
+    s(t, '--skip',             '-k', help='show skipped tests (on by default)')
+    s(t, '--brief',            '-b', help='abbreviate output (e.g. skip ___ lines)')
     s(t, '--no-color',         '-n', help='do not use ASCI colors in command line output')
     s(t, '--no-sync',          '-y', help='show console output asynchronously')
     o(t, str, 'PATH', '--out', '-o', help="output file path (default 'stdout')", default='stdout')
@@ -92,21 +94,28 @@ def run_suite(lib, keypairs, masks, gil, cout, cerr, exe=map):
 
 ################################################################################
 
-def main(run=run_suite, lib='libwil', list=False, failure=False, success=False, brief=False,
+def main(run=run_suite, lib='libwil', list=False, no_default=False, failure=False, success=False, brief=False,
     exception=False, timing=False, quiet=False, capture=False, gil=False, exclude=False,
     no_color=False, regex=None, out='stdout', out_mode='w', xml=None, xml_mode='a+b', suite='lilwil',
-    teamcity=None, json=None, json_indent=None, jobs=0, tests=None, params=None, skip=False, no_sync=None):
+    teamcity=None, json=None, json_indent=None, jobs=0, tests=None, args=None, params=None, skip=False, no_sync=None):
     '''Main non-argparse function for running a subset of lilwil tests with given options'''
 
     lib = import_library(lib)
     indices = test_indices(lib.test_names(), exclude, tests, regex)
-    keypairs = tuple(parametrized_indices(lib, indices, load_parameters(params)))
+    keypairs = tuple(parametrized_indices(lib, indices, load_parameters(args, params)))
 
     if list:
-        print('\n'.join(lib.test_info(i[0])[0] for i in keypairs))
+        fmt = '%{}d: %s'.format(len(str(len(keypairs))))
+        for i, k in enumerate(keypairs):
+            print(fmt % (i, lib.test_info(k[0])[0]))
+        print('\n(%d total tests)' % len(keypairs))
         return
 
-    mask = (failure, success, exception, timing, skip)
+    if no_default:
+        mask = (failure, success, exception, timing, skip)
+    else:
+        mask = (True, success, True, True, True)
+
     info = lib.compile_info()
 
     with ExitStack() as stack:
@@ -143,5 +152,32 @@ def main(run=run_suite, lib='libwil', list=False, failure=False, success=False, 
                    gil=gil, cout=capture, cerr=capture, exe=exe)
 
 
+def exit_main(no_color=False, **kwargs):
+    '''
+    Run the test suite with specified options and exit the program
+    If an exception occurs outside of the test suite, we try to print it in color.
+    (This has a bit of time to import ipython, but it only happens in the case of an error.)
+    '''
+    try:
+        main(no_color=no_color, **kwargs)
+        sys.exit(0)
+    except Exception as e:
+        if no_color:
+            raise
+        x = e
+        info = sys.exc_info()
+
+    try:
+        from IPython.core.ultratb import ColorTB
+    except ImportError:
+        ColorTB = None
+
+    if ColorTB is None:
+        raise x
+
+    sys.stderr.write(ColorTB().text(*info))
+    sys.exit(1)
+
+
 if __name__ == '__main__':
-    main(**vars(parser().parse_args()))
+    exit_main(**vars(parser().parse_args()))
