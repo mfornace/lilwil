@@ -13,6 +13,10 @@
 
 namespace lilwil {
 
+/******************************************************************************/
+
+// Need to provide a default print for a few types as this file does not see user customizations of ToString.
+
 template <class T>
 struct ToString<T, void> {
     std::string operator()(T const &t) const {
@@ -365,7 +369,7 @@ PyObject *lilwil_add_test(PyObject *, PyObject *args) {
 // (str, object) -> None
 PyObject *lilwil_add_value(PyObject *, PyObject *args) {
     char const *name;
-    char const *comment;
+    char const *comment = nullptr;
     PyObject *obj;
     if (!PyArg_ParseTuple(args, "sO|s", &name, &obj, &comment)) return nullptr;
 

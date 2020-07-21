@@ -78,7 +78,7 @@ struct SourceLocation {
     int line = 0;
 };
 
-inline constexpr auto file_line(char const *s, int i) {return SourceLocation{s, i};}
+inline constexpr auto file_line(char const *s, int i) {return SourceLocation{s ? s : "", i};}
 
 template <>
 struct AddKeyValue<SourceLocation> {
@@ -99,7 +99,7 @@ struct Comment {
     // change these for std::source_location when available
     Comment() = default;
     Comment(std::string_view comment) : comment(comment) {}
-    Comment(char const *comment) : comment(comment) {}
+    Comment(char const *comment) : comment(comment ? comment : "") {}
 };
 
 template <>

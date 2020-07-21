@@ -208,8 +208,6 @@ struct ToString<std::string> {
     std::string operator()(std::string s) const {return ToString<std::string_view>()(s);}
 };
 
-#warning "no default print for doubles..."
-
 // void * is also included to avoid issues with specializing pointer types
 // i.e. if you specialize T * to print the dereferenced value, you'll get issues
 // with dereferencing a void pointer if this isn't fully specialized
