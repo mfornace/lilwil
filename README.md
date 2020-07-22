@@ -330,7 +330,7 @@ typename lilwil::Clock::time_point &start = ct.start_time;
 
 If the user specifies a tolerance manually, `Context::within` checks that either `l == r` or (`|l - r| < tolerance`).
 ```c++
-bool ok = ct.within(tolerance, l, r, args...);
+bool ok = ct.within(l, r, tolerance, args...);
 ```
 
 Otherwise, `Context::near()` checks that two arguments are approximately equal by using a specialization of `lilwil::Approx` for the types given.

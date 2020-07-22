@@ -148,23 +148,6 @@ struct Context : BaseContext {
 
     /**************************************************************************/
 
-#warning "clean up these"
-    template <class T>
-    Context & info(T &&t) {BaseContext::info(static_cast<T &&>(t)); return *this;}
-
-    template <class K, class V>
-    Context & info(K &&k, V &&v) {BaseContext::info(static_cast<K &&>(k), static_cast<V &&>(v)); return *this;}
-
-    template <class ...Ts>
-    Context & operator()(Ts &&...ts) {BaseContext::operator()(std::forward<Ts>(ts)...); return *this;}
-
-    Context & operator()(std::initializer_list<KeyValue> const &v) {BaseContext::operator()(v); return *this;}
-
-    template <class ...Ts>
-    Context & capture(Ts &&...ts) {BaseContext::capture(std::forward<Ts>(ts)...); return *this;}
-
-    Context & capture(std::initializer_list<KeyValue> const &v) {BaseContext::capture(v); return *this;}
-
     /// Opens a new section with a reset start_time
     template <class F, class ...Ts>
     auto section(std::string name, F &&functor, Ts &&...ts) const {
@@ -241,8 +224,8 @@ struct Context : BaseContext {
         return require_args(unglue(l) >= unglue(r), c, v, comparison_glue(l, r, Ops::ge));
     }
 
-    template <class T, class L, class R>
-    bool within(T const &tol, L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+    template <class L, class R, class T>
+    bool within(L const &l, R const &r, T const &tol, Comment const &c={}, KeyPairs const &v={}) {
         Within<T> comp{tol};
         bool ok = comp(unglue(l), unglue(r));
         return require_args(ok, c, v, comparison_glue(l, r, Ops::near), glue("tolerance", tol), glue("difference", comp.difference));
