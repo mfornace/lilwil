@@ -1,7 +1,7 @@
 #pragma once
 #include "Config.h"
 #include "Value.h"
-#include "Approx.h"
+#include "Numeric.h"
 #include <string_view>
 
 namespace lilwil {

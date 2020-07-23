@@ -106,4 +106,17 @@ LogWithin<T> log_within(T const &t) {return {t};}
 
 /******************************************************************************/
 
+template <class T, class SFINAE=void>
+struct IsFinite;
+
+template <class T>
+struct IsFinite<T, std::enable_if_t<std::is_floating_point_v<T>>> {
+    bool operator()(T const &t) const {return std::isfinite(t);}
+};
+
+template <class T>
+bool is_finite(T const &t) {return IsFinite<T>()(t);}
+
+/******************************************************************************/
+
 }

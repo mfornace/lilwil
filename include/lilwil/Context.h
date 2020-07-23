@@ -1,5 +1,5 @@
 #pragma once
-#include "Approx.h"
+#include "Numeric.h"
 #include "Glue.h"
 #include "Value.h"
 
@@ -148,6 +148,12 @@ struct Context : BaseContext {
 
     /**************************************************************************/
 
+    template <class ...Ts>
+    Context &operator()(Ts &&...ts) {
+        BaseContext::operator()(std::forward<Ts>(ts)...);
+        return *this;
+    }
+
     /// Opens a new section with a reset start_time
     template <class F, class ...Ts>
     auto section(std::string name, F &&functor, Ts &&...ts) const {
@@ -195,7 +201,7 @@ struct Context : BaseContext {
     /******************************************************************************/
 
     template <class L, class R>
-    auto equal(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+    bool equal(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
         return require_args(unglue(l) == unglue(r), c, v, comparison_glue(l, r, Ops::eq));
     }
 
@@ -231,6 +237,11 @@ struct Context : BaseContext {
         return require_args(ok, c, v, comparison_glue(l, r, Ops::near), glue("tolerance", tol), glue("difference", comp.difference));
     }
 
+    template <class T>
+    bool is_finite(T const &t, Comment const &c={}, KeyPairs const &v={}) {
+        return require_args(::lilwil::is_finite(unglue(t)), c, v, glue("value", t));
+    }
+
     template <class L, class R>
     bool near(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
         Near<typename NearType<L, R>::type> comp;
@@ -239,7 +250,7 @@ struct Context : BaseContext {
     }
 
     template <class T, class L, class R>
-    bool log_within(T const &tol, L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
+    bool within_log(L const &l, R const &r, T const &tol, Comment const &c={}, KeyPairs const &v={}) {
         LogWithin<T> comp{tol};
         bool ok = (unglue(l), unglue(r));
         return require_args(ok, c, v, comparison_glue(l, r, Ops::near), glue("tolerance", tol), glue("relative difference", comp.difference));
