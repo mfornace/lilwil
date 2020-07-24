@@ -141,15 +141,6 @@ struct ViewAs {
 
 /******************************************************************************/
 
-// Allow integer to bool. SFINAE in case user has a different desired behavior
-template <class SFINAE>
-struct ViewAs<bool, SFINAE> {
-    bool operator()(Value const &a) const {
-        if (auto p = a.target<Integer>()) return *p;
-        throw a.no_conversion(typeid(bool));
-    }
-};
-
 // Allow integer to integer.
 template <class T>
 struct ViewAs<T, std::enable_if_t<std::is_integral_v<T>>> {
