@@ -233,26 +233,27 @@ struct Context : BaseContext {
     template <class L, class R, class T>
     bool within(L const &l, R const &r, T const &tol, Comment const &c={}, KeyPairs const &v={}) {
         Within<T> comp{tol};
-        bool ok = comp(unglue(l), unglue(r));
+        bool const ok = comp(unglue(l), unglue(r));
         return require_args(ok, c, v, comparison_glue(l, r, Ops::near), glue("tolerance", tol), glue("difference", comp.difference));
     }
 
     template <class T>
     bool is_finite(T const &t, Comment const &c={}, KeyPairs const &v={}) {
-        return require_args(::lilwil::is_finite(unglue(t)), c, v, glue("value", t));
+        auto const ok = ::lilwil::is_finite(unglue(t));
+        return require_args(ok, c, v, glue("value", t), glue("is_finite", ok));
     }
 
     template <class L, class R>
     bool near(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
         Near<typename NearType<L, R>::type> comp;
-        bool ok = comp(unglue(l), unglue(r));
+        bool const ok = comp(unglue(l), unglue(r));
         return require_args(ok, c, v, comparison_glue(l, r, Ops::near), glue("difference", comp.difference));
     }
 
     template <class T, class L, class R>
     bool within_log(L const &l, R const &r, T const &tol, Comment const &c={}, KeyPairs const &v={}) {
         LogWithin<T> comp{tol};
-        bool ok = (unglue(l), unglue(r));
+        bool const ok = (unglue(l), unglue(r));
         return require_args(ok, c, v, comparison_glue(l, r, Ops::near), glue("tolerance", tol), glue("relative difference", comp.difference));
     }
 
