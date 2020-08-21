@@ -134,7 +134,7 @@ def main(run=run_suite, lib='libwil', list=False, no_default=False, failure=Fals
 
         if teamcity:
             from .teamcity import TeamCityReport
-            r = TeamCityReport(open_file(stack, teamcity, 'w'), info)
+            r = TeamCityReport(open_file(stack, teamcity, 'w'), info, sync=jobs > 1 and not no_sync)
             masks.append((stack.enter_context(r), (1, 0, 1))) # failures & exceptions
 
         if json:
