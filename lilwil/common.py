@@ -99,27 +99,33 @@ def open_file(stack, name, mode):
 
 ################################################################################
 
-def test_indices(names, exclude=False, tests=None, regex='', strict=False):
+def test_indices(names, indices=None, exclude=False, tests=None, regex='', strict=False):
     '''
     Return list of indices of tests to run
         exclude: whether to include or exclude the specified tests
         tests: list of manually specified tests
         regex: pattern to specify tests
     '''
-    if tests:
-        out = set()
+    out = set()
+    if tests: # manually specified tests
         for t in tests:
             try:
                 out.add(names.index(t) if strict else next(i for i, n in enumerate(names) if t in n))
             except (StopIteration, ValueError):
-                raise KeyError('Key {} is not in the test suite'.format(repr(t)))
-    else:
-        out = set() if (regex or exclude) else set(range(len(names)))
+                raise KeyError('Manually specified test %r is not in the test suite' % t) from None
 
     if regex:
         import re
         pattern = re.compile(regex)
         out.update(i for i, t in enumerate(names) if pattern.match(t))
+
+    if indices:
+        for i in indices:
+            _ = names[i] # check that index is valid
+        out.update(i for i in indices)
+
+    if not indices and not regex and not tests:
+        out = set(range(len(names)))
 
     if exclude:
         out = set(range(len(names))).difference(out)
