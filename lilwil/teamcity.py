@@ -73,7 +73,7 @@ class TeamCityLazyReport(Report):
             f = self.messages.testSkipped
         else:
             return
-        self.log.append(f, self.name, readable_message(event, scopes, logs))
+        self.log.append((f, self.name, readable_message(event, scopes, logs)))
 
     def finalize(self, value, time, counts, out, err):
         self.messages.testStarted(self.name)
