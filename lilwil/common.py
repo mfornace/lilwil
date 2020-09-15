@@ -109,10 +109,15 @@ def test_indices(names, indices=None, exclude=False, tests=None, regex='', stric
     out = set()
     if tests: # manually specified tests
         for t in tests:
-            try:
-                out.add(names.index(t) if strict else next(i for i, n in enumerate(names) if t in n))
-            except (StopIteration, ValueError):
+            if t in names:
+                out.add(names.index(t))
+            elif strict:
                 raise KeyError('Manually specified test %r is not in the test suite' % t) from None
+            else:
+                try:
+                    out.add(next(i for i, n in enumerate(names) if t in n))
+                except StopIteration:
+                    raise KeyError('Manually specified test %r is not in the test suite' % t) from None
 
     if regex:
         import re

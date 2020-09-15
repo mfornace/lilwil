@@ -168,25 +168,25 @@ def exit_main(no_color=False, **kwargs):
     If an exception occurs outside of the test suite, we try to print it in color.
     (This has a bit of time to import ipython, but it only happens in the case of an error.)
     '''
-    try:
-        main(no_color=no_color, **kwargs)
-        sys.exit(0)
-    except Exception as e:
-        if no_color:
-            raise
-        x = e
-        info = sys.exc_info()
+    # try:
+    main(no_color=no_color, **kwargs)
+    sys.exit(0)
+    # except Exception as e:
+    #     if no_color:
+    #         raise
+    #     x = e
+    #     info = sys.exc_info()
 
-    try:
-        from IPython.core.ultratb import ColorTB
-    except ImportError:
-        ColorTB = None
+    # try:
+    #     from IPython.core.ultratb import ColorTB
+    # except ImportError:
+    #     ColorTB = None
 
-    if ColorTB is None:
-        raise x
+    # if ColorTB is None:
+    #     raise x
 
-    sys.stderr.write(ColorTB().text(*info))
-    sys.exit(1)
+    # sys.stderr.write(ColorTB().text(*info))
+    # sys.exit(1)
 
 
 if __name__ == '__main__':
