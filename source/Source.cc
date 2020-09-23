@@ -62,8 +62,8 @@ std::string wrong_number_string(std::size_t r, std::size_t e) {
 
 /******************************************************************************/
 
-StreamSync cout_sync{std::cout, std::cout.rdbuf()};
-StreamSync cerr_sync{std::cerr, std::cerr.rdbuf()};
+StreamSync cout_sync{std::cout, std::cout.rdbuf(), {}};
+StreamSync cerr_sync{std::cerr, std::cerr.rdbuf(), {}};
 
 /******************************************************************************/
 

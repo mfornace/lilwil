@@ -63,8 +63,8 @@ struct Base {
 
     /// Opens a Context and sets the start_time to the current time
     Base(Scopes scopes, Vector<Handler> handlers, Vector<Counter> *counters=nullptr, void *metadata=nullptr)
-        : scopes(std::move(scopes)), handlers(std::move(handlers)),
-          counters(counters), start_time(Clock::now()), metadata(metadata) {}
+        : handlers(std::move(handlers)), scopes(std::move(scopes)),
+          start_time(Clock::now()), counters(counters), metadata(metadata) {}
 
     /**************************************************************************/
 
