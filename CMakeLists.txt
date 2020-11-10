@@ -60,7 +60,7 @@ function(lilwil_module target_name output_name)
 
     add_library(${target_name} MODULE ${files})
     set_target_properties(${target_name} PROPERTIES PREFIX "lib"
-        LIBRARY_OUTPUT_DIRECTORY ${binary_dir} OUTPUT_NAME ${output_name})
+        LIBRARY_OUTPUT_DIRECTORY ${binary_dir} OUTPUT_NAME ${output_name}_lilwil)
 
     if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
         set_target_properties(${target_name} PROPERTIES LINK_FLAGS "-Wl,-flat_namespace,-undefined,dynamic_lookup")
@@ -68,12 +68,12 @@ function(lilwil_module target_name output_name)
         set_target_properties(${target_name} PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
     endif()
 
-    target_compile_definitions(${target_name} PRIVATE LILWIL_MODULE=lib${output_name})
+    target_compile_definitions(${target_name} PRIVATE LILWIL_MODULE=lib${output_name}_lilwil)
     target_link_libraries(${target_name} PRIVATE lilwil_interface ${ARGN})
     target_include_directories(${target_name} PRIVATE ${python_include})
 
     # following not quite right in all cases...
-    set(LILWIL_DEFAULT_LIBRARY_NAME lib${output_name})
+    set(LILWIL_DEFAULT_LIBRARY_NAME lib${output_name}_lilwil)
     set(LILWIL_DEFAULT_PYTHON_PATH ${source_dir})
     set(LILWIL_DEFAULT_LIBRARY_PATH ${binary_dir})
     configure_file(${source_dir}/source/test.py ${CMAKE_CURRENT_BINARY_DIR}/${output_name}.py)
