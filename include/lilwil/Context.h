@@ -253,7 +253,7 @@ struct Context : BaseContext {
     template <class T, class L, class R>
     bool within_log(L const &l, R const &r, T const &tol, Comment const &c={}, KeyPairs const &v={}) {
         LogWithin<T> comp{tol};
-        bool const ok = (unglue(l), unglue(r));
+        bool const ok = comp(unglue(l), unglue(r));
         return require_args(ok, c, v, comparison_glue(l, r, Ops::near), glue("tolerance", tol), glue("relative difference", comp.difference));
     }
 
