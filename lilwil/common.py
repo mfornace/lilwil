@@ -161,14 +161,14 @@ def nice_eval(string, modules=None):
 
     return eval(string, mods)
 
-def load_parameters(args, params):
+def load_parameters(args, params, strings):
     ''' load parameters from one of:
     - None
     - dict-like
     - JSON file name
     - eval-able str
     '''
-    args = tuple(nice_eval(p) for p in args or ())
+    args = tuple(nice_eval(p) for p in args or ()) + (tuple(strings or ()),)
     out = defaultdict(lambda: args)
     for p in params or ():
         with open(p) as f:

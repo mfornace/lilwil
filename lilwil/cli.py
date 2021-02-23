@@ -27,6 +27,7 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
     o(p, str, 'STR',  '--indices',  '-i', help="specify tests by indices like 1:4 or 1,2,3")
     s(p, '--exclude',            '-x', help='exclude rather than include specified cases')
     s(p, '--capture',            '-c', help='capture std::cerr and std::cout')
+    o(p, str, 'STR', '--string', '-z', action='append', help='raw string value for a parameter to avoid need for escaping')
     o(p, str, 'STR', '--args',   '-a', action='append', help='int or Python tuple expression for a parameter pack to apply to each test (may be specified multiple times)')
     o(p, str, 'STR', '--params', '-p', action='append', help='JSON file for all parameters (in {"name": [packs...], ...} form; may be specified multiple times)')
     s(p, '--gil',                '-g', help='keep Python global interpeter lock on')
@@ -95,7 +96,7 @@ def run_suite(lib, keypairs, masks, gil, cout, cerr, exe=map):
 
 ################################################################################
 
-def main(run=run_suite, lib='libwil', no_default=False, failure=False,
+def main(run=run_suite, lib='libwil', string=None, no_default=False, failure=False,
     success=False, brief=False, list=False, exception=False, timing=False,
     quiet=False, capture=False, gil=False, exclude=False, no_color=False,
     regex=None, out='stdout', out_mode='w', xml=None, xml_mode='a+b', suite='lilwil',
@@ -112,7 +113,7 @@ def main(run=run_suite, lib='libwil', no_default=False, failure=False,
 
     names = lib.test_names()
     indices = test_indices(names, exclude=exclude, tests=tests, regex=regex, indices=indices)
-    keypairs = tuple(parametrized_indices(lib, indices, load_parameters(args, params)))
+    keypairs = tuple(parametrized_indices(lib, indices, load_parameters(args, params, string)))
 
     if list:
         fmt = '%{}d: %s'.format(len(str(len(names))))
