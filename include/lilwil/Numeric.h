@@ -71,6 +71,8 @@ struct Within {
     T tolerance;
     mutable T difference;
 
+    explicit Within(T t) : tolerance(std::move(t)) {}
+
     template <class L, class R>
     bool operator()(L const &l, R const &r) const {
         if (l == r) return true;
@@ -90,6 +92,8 @@ template <class T>
 struct LogWithin {
     T tolerance;
     mutable T difference;
+
+    explicit LogWithin(T t) : tolerance(std::move(t)) {}
 
     template <class L, class R>
     bool operator()(L const &l, R const &r) const {
