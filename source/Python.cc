@@ -21,6 +21,9 @@ template <class T>
 struct ToString<T, void> {
     std::string operator()(T const &t) const {
         std::stringstream ss;
+        if constexpr(std::is_floating_point_v<T>) {
+            ss << std::setprecision(std::numeric_limits<T>::digits10 + 1);
+        }
         ss << t;
         return std::move(ss).str();
     }
