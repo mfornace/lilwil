@@ -200,6 +200,13 @@ struct Context : BaseContext {
 
     /******************************************************************************/
 
+    constexpr auto equal() const {return std::equal_to<>();}
+    constexpr auto not_equal() const {return std::not_equal_to<>();}
+    constexpr auto less() const {return std::less<>();}
+    constexpr auto greater() const {return std::greater<>();}
+    constexpr auto less_eq() const {return std::less_equal<>();}
+    constexpr auto greater_eq() const {return std::greater_equal<>();}
+
     template <class L, class R>
     bool equal(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
         return require_args(unglue(l) == unglue(r), c, v, comparison_glue(l, r, Ops::eq));
