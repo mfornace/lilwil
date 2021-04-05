@@ -168,8 +168,14 @@ def load_parameters(args, params, strings):
     - JSON file name
     - eval-able str
     '''
-    args = tuple(nice_eval(p) for p in args or ()) + (tuple(strings or ()),)
-    out = defaultdict(lambda: args)
+    defaults = ()
+    if args:
+        defaults += tuple(nice_eval(p) for p in args)
+    if strings:
+        defaults += (tuple(strings),)
+    if not defaults:
+        defaults = ((),)
+    out = defaultdict(lambda: defaults)
     for p in params or ():
         with open(p) as f:
             out.update(json.load(f))
@@ -210,7 +216,6 @@ def parametrized_indices(lib, indices, params=(None,)):
         # add a single empty argument pack if none exists
         if not ps:
             ps.append(tuple())
-
         # yield each parameter pack for this test
         for p in ps:
             if not isinstance(p, int) or p < n:

@@ -112,7 +112,7 @@ struct AddKeyValue<Comment> {
 
 /******************************************************************************/
 
-enum class Ops {eq, ne, lt, gt, le, ge, near};
+enum class Ops {eq, ne, lt, gt, le, ge, near, custom};
 
 template <>
 struct ToString<Ops> {
@@ -127,19 +127,28 @@ struct ComparisonGlue {
     Ops relation;
 };
 
-constexpr Ops ops_of(Ops o) {return o;}
+template <class T>
+struct OpsOf {
+    constexpr auto operator()(T const &) const {return Ops::custom;}
+};
 
-template <class T> constexpr Ops ops_of(std::equal_to<T>) {return Ops::eq;}
-template <class T> constexpr Ops ops_of(std::not_equal_to<T>) {return Ops::eq;}
-template <class T> constexpr Ops ops_of(std::less<T>) {return Ops::eq;}
-template <class T> constexpr Ops ops_of(std::greater<T>) {return Ops::eq;}
-template <class T> constexpr Ops ops_of(std::greater_equal<T>) {return Ops::eq;}
-template <class T> constexpr Ops ops_of(std::less_equal<T>) {return Ops::eq;}
-template <class T> constexpr Ops ops_of(Near<T>) {return Ops::eq;}
-template <class T> constexpr Ops ops_of(Within<T>) {return Ops::eq;}
+template <>
+struct OpsOf<Ops> {
+    constexpr Ops operator()(Ops o) const {return o;}
+};
+
+#define LILWIL_TMP(O, V) template <class T> struct OpsOf<O<T>> {constexpr Ops operator()(O<T> const &) const {return V;}}
+LILWIL_TMP(std::not_equal_to,  Ops::eq);
+LILWIL_TMP(std::less,          Ops::lt);
+LILWIL_TMP(std::greater,       Ops::gt);
+LILWIL_TMP(std::greater_equal, Ops::ge);
+LILWIL_TMP(std::less_equal,    Ops::le);
+LILWIL_TMP(Near,               Ops::near);
+LILWIL_TMP(Within,             Ops::near);
+#undef LILWIL_TMP
 
 template <class L, class R, class T>
-ComparisonGlue<L const &, R const &> comparison_glue(L const &l, R const &r, T const &op) {return {l, r, ops_of(op)};}
+ComparisonGlue<L const &, R const &> comparison_glue(L const &l, R const &r, T const &op) {return {l, r, OpsOf<T>()(op)};}
 
 template <class L, class R>
 struct AddKeyValue<ComparisonGlue<L, R>> {

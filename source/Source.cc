@@ -156,21 +156,23 @@ std::string ToString<Ops>::operator()(Ops s) const {
     std::string out;
     switch (s) {
 #ifdef LILWIL_UNICODE
-        case Ops::eq:   {out = "="; break;}
-        case Ops::ne:   {out = u8"\u2260"; break;}
-        case Ops::lt:   {out = "<"; break;}
-        case Ops::gt:   {out = ">"; break;}
-        case Ops::le:   {out = u8"\u2264"; break;}
-        case Ops::ge:   {out = u8"\u2265"; break;}
-        case Ops::near: {out = u8"\u2248"; break;}
+        case Ops::eq:     {out = "="; break;}
+        case Ops::ne:     {out = u8"\u2260"; break;}
+        case Ops::lt:     {out = "<"; break;}
+        case Ops::gt:     {out = ">"; break;}
+        case Ops::le:     {out = u8"\u2264"; break;}
+        case Ops::ge:     {out = u8"\u2265"; break;}
+        case Ops::near:   {out = u8"\u2248"; break;}
+        case Ops::custom: {out = u8"\u2B0C"; break;}
 #else
-        case Ops::eq:   {out = "=="; break;}
-        case Ops::ne:   {out = "!="; break;}
-        case Ops::lt:   {out = "<"; break;}
-        case Ops::gt:   {out = ">"; break;}
-        case Ops::le:   {out = "<="; break;}
-        case Ops::ge:   {out = ">="; break;}
-        case Ops::near: {out = "=="; break;}
+        case Ops::eq:     {out = "=="; break;}
+        case Ops::ne:     {out = "!="; break;}
+        case Ops::lt:     {out = "<"; break;}
+        case Ops::gt:     {out = ">"; break;}
+        case Ops::le:     {out = "<="; break;}
+        case Ops::ge:     {out = ">="; break;}
+        case Ops::near:   {out = "=="; break;}
+        case Ops::custom: {out = "<~>"; break;}
 #endif
     }
     return out;
