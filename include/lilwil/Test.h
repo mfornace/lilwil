@@ -121,17 +121,17 @@ struct TestCase {
         name(n), comment(c.comment), function(std::move(f)), parameters(std::move(p)), location(c.location) {}
 };
 
-
-void add_test(TestCase t);
+// Add test case and return its index
+std::size_t add_test(TestCase t);
 
 template <class F>
-void add_raw_test(std::string_view name, F const &f, Comment comment={}, Vector<ArgPack> v={}) {
+std::size_t add_raw_test(std::string_view name, F const &f, Comment comment={}, Vector<ArgPack> v={}) {
     // if (TestSignature<F>::size <= 2 && v.empty()) v.emplace_back();
-    add_test(TestCase(name, TestAdapter<F>{f}, comment, std::move(v)));
+    return add_test(TestCase(name, TestAdapter<F>{f}, comment, std::move(v)));
 }
 
 template <class F>
-void add_test(std::string_view name, F const &f, Comment comment={}, Vector<ArgPack> v={}) {
+std::size_t add_test(std::string_view name, F const &f, Comment comment={}, Vector<ArgPack> v={}) {
     return add_raw_test(name, packs::SimplifyFunction<F>()(f), comment, std::move(v));
 }
 
@@ -164,14 +164,54 @@ bool anonymous_test(std::string_view name, F const &fun, Comment comment={}, Vec
     return bool();
 }
 
+struct Parameters {
+    Vector<ArgPack> contents;
+    Parameters(Vector<ArgPack> c) : contents(std::move(c)) {}
+    Parameters(std::initializer_list<ArgPack> const &c) : contents(c.begin(), c.end()) {}
+    void take(Parameters &&other);
+};
+
+template <class F>
+struct Bundle {
+    Parameters parameters;
+    F functor;
+};
+
+/******************************************************************************/
+
+template <class T>
+struct BundleTraits {
+    static T&& functor(T &&t) {return std::move(t);}
+    static Vector<ArgPack> parameters(T &&) {return {};}
+    static Bundle<T> bundle(T &&t, Parameters &&d) {return {std::move(d), std::move(t)};}
+};
+
+template <class F>
+struct BundleTraits<Bundle<F>> {
+    static F&& functor(Bundle<F> &&t) {return std::move(t.functor);}
+    static Vector<ArgPack>&& parameters(Bundle<F> &&t) {return std::move(t.parameters.contents);}
+    static Bundle<F> bundle(Bundle<F> &&t, Parameters &&d) {
+        t.parameters.take(std::move(d));
+        return std::move(t);
+    }
+};
+
+/******************************************************************************/
+
+template <class F>
+auto operator<<(F f, Parameters d) {return BundleTraits<F>::bundle(std::move(f), std::move(d));}
+
+/******************************************************************************/
+
 /// Helper class for UNIT_TEST() macro, overloads the = operator to make it a bit prettier.
 struct AnonymousClosure {
     std::string_view name, comment, file;
     int line;
 
     template <class F>
-    constexpr bool operator=(F const &f) && {
-        return anonymous_test(name, f, Comment(comment, file, line));
+    constexpr bool operator=(F f) && {
+        return anonymous_test(name, BundleTraits<F>::functor(std::move(f)),
+            Comment(comment, file, line), BundleTraits<F>::parameters(std::move(f)));
     }
 };
 

@@ -62,6 +62,12 @@ std::string wrong_number_string(std::size_t r, std::size_t e) {
 
 /******************************************************************************/
 
+void Parameters::take(Parameters &&other) {
+    contents.insert(contents.end(), std::make_move_iterator(other.contents.begin()), std::make_move_iterator(other.contents.end()));
+}
+
+/******************************************************************************/
+
 StreamSync cout_sync{std::cout, std::cout.rdbuf(), {}};
 StreamSync cerr_sync{std::cerr, std::cerr.rdbuf(), {}};
 
@@ -136,9 +142,11 @@ Value get_value(std::string_view s, bool allow_missing) {
     });
 }
 
-void add_test(TestCase t) {
-    write_suite([&](auto &cases) {
+std::size_t add_test(TestCase t) {
+    return write_suite([&](auto &cases) {
+        std::size_t n = cases.size();
         cases.emplace_back(std::move(t));
+        return n;
     });
 }
 
