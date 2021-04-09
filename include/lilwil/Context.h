@@ -44,6 +44,7 @@ using KeyStrings = std::vector<KeyString>;
 using Handler = std::function<bool(Event, Scopes const &, KeyStrings)>;
 
 using Counter = std::atomic<std::size_t>;
+using Signal = std::atomic<bool>;
 
 /******************************************************************************/
 
@@ -54,17 +55,20 @@ struct Base {
     Scopes scopes;
     /// Start time of the current test case or section
     typename Clock::time_point start_time;
-    /// Possibly null handle to a vector of atomic counters for each Event. Test runner has responsibility for lifetime
+    /// Possibly null handle to a vector of atomic counters for each Event. Test runner has responsibility for lifetime.
     Vector<Counter> *counters = nullptr;
+    /// Signal to stop tests early (e.g. keyboard interrupt). Test runner has responsibility for lifetime.
+    Signal const *signal;
     /// Metadata for use by handlers
     void *metadata = nullptr;
 
     Base() = default;
 
     /// Opens a Context and sets the start_time to the current time
-    Base(Scopes scopes, Vector<Handler> handlers, Vector<Counter> *counters=nullptr, void *metadata=nullptr)
+    Base(Scopes scopes, Vector<Handler> handlers, Vector<Counter> *counters=nullptr,
+        Signal const *signal=nullptr, void *metadata=nullptr)
         : handlers(std::move(handlers)), scopes(std::move(scopes)),
-          start_time(Clock::now()), counters(counters), metadata(metadata) {}
+          start_time(Clock::now()), counters(counters), signal(signal), metadata(metadata) {}
 
     /**************************************************************************/
 
@@ -122,19 +126,17 @@ struct BaseContext : Base {
 
     /**************************************************************************/
 
+    void update_counter(Event e);
+
+    void emit_event(Event e, KeyPairs const keypairs);
+
     template <class ...Ts>
-    void handle(Event e, Comment const &c, KeyPairs const v, Ts &&...ts) {
+    void handle(Event e, Comment const &c, KeyPairs const keypairs, Ts &&...ts) {
         if (e.index < handlers.size() && handlers[e.index]) {
-            KeyStrings strings;
             AddKeyValue<Comment>()(logs, c);
             (AddKeyValue<std::decay_t<Ts>>()(logs, std::forward<Ts>(ts)), ...);
-            for (auto const &log: logs) strings.emplace_back(log.key, log.value.to_string());
-            for (auto const &log: v) strings.emplace_back(log.key, log.value.to_string());
-            handlers[e.index](e.index, scopes, strings);
         }
-        if (counters && e.index < counters->size())
-            (*counters)[e.index].fetch_add(1u, std::memory_order_relaxed);
-        logs.erase(logs.begin() + reserved_logs, logs.end());
+        emit_event(e, keypairs);
     }
 };
 

@@ -6,6 +6,7 @@
 #include <optional>
 #include <vector>
 #include <sstream>
+#include <list>
 
 #if __has_include(<filesystem>)
 #    include <filesystem>
@@ -191,6 +192,33 @@ bool build_handlers(Vector<Handler> &v, Object calls) {
 
 /******************************************************************************/
 
+std::mutex interrupts_mutex;
+std::list<std::atomic<bool>> interrupts;
+
+Object set_interrupt_signal(bool b) noexcept {
+    std::lock_guard<std::mutex> lock(interrupts_mutex);
+    for (auto &i : interrupts) i.store(b, std::memory_order_relaxed);
+    return Object(Py_None, true);
+}
+
+/******************************************************************************/
+
+struct InterruptEntry {
+    typename std::list<std::atomic<bool>>::iterator iter;
+
+    InterruptEntry() {
+        std::lock_guard<std::mutex> lock(interrupts_mutex);
+        interrupts.emplace_back(false);
+        iter = std::prev(interrupts.end());
+    }
+    ~InterruptEntry() {
+        std::lock_guard<std::mutex> lock(interrupts_mutex);
+        interrupts.erase(iter);
+    }
+};
+
+/******************************************************************************/
+
 Value run_test(double &time, TestCase const &test, bool no_gil,
                Vector<Counter> &counts, Vector<Handler> handlers, ArgPack pack) {
     no_gil = no_gil && !test.function.target<PyTestCase>();
@@ -200,7 +228,8 @@ Value run_test(double &time, TestCase const &test, bool no_gil,
 
     for (auto &c : counts) c.store(0u);
 
-    Context ctx({test.name}, std::move(handlers), &counts, &lk);
+    InterruptEntry entry;
+    Context ctx({test.name}, std::move(handlers), &counts, &*entry.iter, &lk);
     Timer t(time);
 
     if (!test.function) throw std::runtime_error("Test case has empty std::function");
@@ -255,6 +284,8 @@ Object run_test(Py_ssize_t i, Object calls, Object pypack, bool cout, bool cerr,
     double test_time = 0;
     Vector<lilwil::Counter> counters(handlers.size());
 
+// I think we want Python interrupt signal to set these counters to an invalid number
+// Otherwise we need to just add an atomic_bool to the handler ...
     {
         lilwil::RedirectStream o(lilwil::cout_sync, cout ? out.rdbuf() : nullptr);
         lilwil::RedirectStream e(lilwil::cerr_sync, cerr ? err.rdbuf() : nullptr);

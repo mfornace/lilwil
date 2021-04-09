@@ -62,6 +62,22 @@ std::string wrong_number_string(std::size_t r, std::size_t e) {
 
 /******************************************************************************/
 
+void BaseContext::update_counter(Event e) {
+    if (counters && e.index < counters->size())
+        (*counters)[e.index].fetch_add(1u, std::memory_order_relaxed);
+    logs.erase(logs.begin() + reserved_logs, logs.end());
+    if (signal && signal->load(std::memory_order_relaxed)) throw Skip();
+}
+
+void BaseContext::emit_event(Event e, KeyPairs const keypairs) {
+    KeyStrings strings;
+    for (auto const &log: logs) strings.emplace_back(log.key, log.value.to_string());
+    for (auto const &log: keypairs) strings.emplace_back(log.key, log.value.to_string());
+    handlers[e.index](e.index, scopes, strings);
+}
+
+/******************************************************************************/
+
 void Parameters::take(Parameters &&other) {
     contents.insert(contents.end(), std::make_move_iterator(other.contents.begin()), std::make_move_iterator(other.contents.end()));
 }
