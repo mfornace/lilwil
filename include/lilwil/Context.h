@@ -135,8 +135,9 @@ struct BaseContext : Base {
         if (e.index < handlers.size() && handlers[e.index]) {
             AddKeyValue<Comment>()(logs, c);
             (AddKeyValue<std::decay_t<Ts>>()(logs, std::forward<Ts>(ts)), ...);
+            emit_event(e, keypairs);
         }
-        emit_event(e, keypairs);
+        update_counter(e);
     }
 };
 

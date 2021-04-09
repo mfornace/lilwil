@@ -1,6 +1,5 @@
-import typing, sys
+import typing, sys, signal
 from io import StringIO
-from functools import partial
 
 from .common import Event, run_test, open_file, load_parameters, import_library
 from .common import ExitStack, test_indices, parametrized_indices
@@ -31,6 +30,7 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
     o(p, str, 'STR', '--args',   '-a', action='append', help='int or Python tuple expression for a parameter pack to apply to each test (may be specified multiple times)')
     o(p, str, 'STR', '--params', '-p', action='append', help='JSON file for all parameters (in {"name": [packs...], ...} form; may be specified multiple times)')
     s(p, '--gil',                '-g', help='keep Python global interpeter lock on')
+    s(p, '--no-signal',                help='prevent catching SIGINT signal')
     o(p, str, '', 'tests', nargs='*',  help='test names (if not given, specifies all tests that can be run without any user-specified parameters)')
 
     r = p.add_argument_group('reporter options')
@@ -64,30 +64,53 @@ def run_index(lib, masks, out, err, gil, cout, cerr, p):
     i, args = p
     info = lib.test_info(i)
     test_masks = [(r(i, args, info), m) for r, m in masks]
-    val, time, counts = run_test(lib, i, test_masks, out=out, err=err, args=args, gil=gil, cout=cout, cerr=cerr)
+    val, time, counts = run_test(lib, i, test_masks, out=out, err=err,
+        args=args, gil=gil, cout=cout, cerr=cerr)
     return (1, time) + counts
 
 ################################################################################
 
-def run_suite(lib, keypairs, masks, gil, cout, cerr, exe=map):
+class Interrupt:
+    def __init__(self, lib, active):
+        self.active = active
+        self.lib = lib
+        self.was_interrupted = False
+
+    def __call__(self, value, frame):
+        self.lib.set_signal(True)
+        self.was_interrupted = True
+
+    def __enter__(self):
+        if self.active:
+            signal.signal(signal.SIGINT, self)
+
+    def __exit__(self, value, type, traceback):
+        if self.active:
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+################################################################################
+
+def run_suite(lib, keypairs, masks, gil, cout, cerr, signals, exe=map):
     '''Run a subset of tests'''
     out, err = StringIO(), StringIO()
-    f = partial(run_index, lib, masks, out, err, gil, cout, cerr)
+    interrupt = Interrupt(lib, signals)
+    def f(p):
+        if not interrupt.was_interrupted:
+            return run_index(lib, masks, out, err, gil, cout, cerr, p)
 
-    output = [0] * (len(Event) + 2)
-    try:
+    with interrupt:
+        output = [0] * (len(Event) + 2)
         for result in exe(f, keypairs):
+            if result is None:
+                break
             output = [(o + r) for o, r in zip(output, result)]
-        interrupt = False
-    except KeyboardInterrupt: # prettify the report of this error type
-        interrupt = True
 
-    n, time, *counts = output
+        n, time, *counts = output
 
-    for r, _ in masks:
-        r.finalize(n, time, counts, out.getvalue(), err.getvalue())
+        for r, _ in masks:
+            r.finalize(n, time, counts, out.getvalue(), err.getvalue())
 
-    if interrupt:
+    if interrupt.was_interrupted:
         import sys
         print('Test suite was interrupted while running')
         sys.exit(1)
@@ -101,7 +124,7 @@ def main(run=run_suite, lib='libwil', string=None, no_default=False, failure=Fal
     quiet=False, capture=False, gil=False, exclude=False, no_color=False,
     regex=None, out='stdout', out_mode='w', xml=None, xml_mode='a+b', suite='lilwil',
     teamcity=None, json=None, json_indent=None, jobs=0, tests=None, indices=None,
-    args=None, params=None, skip=False, no_sync=None):
+    args=None, params=None, skip=False, no_sync=None, no_signal=False):
     '''Main non-argparse function for running a subset of lilwil tests with given options'''
 
     lib = import_library(lib)
@@ -160,7 +183,7 @@ def main(run=run_suite, lib='libwil', string=None, no_default=False, failure=Fal
             exe = map
 
         return run(lib=lib, keypairs=keypairs, masks=masks,
-                   gil=gil, cout=capture, cerr=capture, exe=exe)
+            gil=gil, cout=capture, cerr=capture, signals=not no_signal, exe=exe)
 
 
 def exit_main(no_color=False, **kwargs):

@@ -195,10 +195,9 @@ bool build_handlers(Vector<Handler> &v, Object calls) {
 std::mutex interrupts_mutex;
 std::list<std::atomic<bool>> interrupts;
 
-Object set_interrupt_signal(bool b) noexcept {
+void set_signal(bool b) noexcept {
     std::lock_guard<std::mutex> lock(interrupts_mutex);
     for (auto &i : interrupts) i.store(b, std::memory_order_relaxed);
-    return Object(Py_None, true);
 }
 
 /******************************************************************************/
@@ -360,6 +359,17 @@ PyObject *lilwil_run_test(PyObject *self, PyObject *args) {
             PyObject_IsTrue(+cout), PyObject_IsTrue(+cerr), PyObject_Not(+gil));
         return ret;
     });
+}
+
+/******************************************************************************/
+
+// () -> None
+PyObject *lilwil_set_signal(PyObject *, PyObject *args) {
+    int to;
+    if (!PyArg_ParseTuple(args, "p", &to)) return nullptr;
+    lilwil::set_signal(to);
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 /******************************************************************************/
