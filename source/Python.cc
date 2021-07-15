@@ -84,7 +84,7 @@ std::optional<String> string_from_unicode(PyObject *o) {
     char const *c = PyUnicode_AsUTF8AndSize(o, &size);
 #else
     char *c;
-    if (PyString_AsStringAndSize(o, &c, &size)) return false;
+    if (PyString_AsStringAndSize(o, &c, &size)) c = nullptr;
 #endif
     std::optional<String> out;
     if (c) out.emplace(static_cast<char const *>(c), size);
