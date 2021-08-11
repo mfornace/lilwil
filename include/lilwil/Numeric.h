@@ -89,11 +89,11 @@ Within<T> within(T const &t) {return {t};}
 /******************************************************************************/
 
 template <class T>
-struct LogWithin {
+struct WithinLog {
     T tolerance;
     mutable T difference;
 
-    explicit LogWithin(T t) : tolerance(std::move(t)) {}
+    explicit WithinLog(T t) : tolerance(std::move(t)) {}
 
     template <class L, class R>
     bool operator()(L const &l, R const &r) const {
@@ -106,7 +106,7 @@ struct LogWithin {
 };
 
 template <class T>
-LogWithin<T> log_within(T const &t) {return {t};}
+WithinLog<T> within_log(T const &t) {return {t};}
 
 /******************************************************************************/
 
