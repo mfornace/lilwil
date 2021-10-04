@@ -174,7 +174,7 @@ def load_parameters(args, params, strings):
     if strings:
         defaults += (tuple(strings),)
     if not defaults:
-        defaults = ((),)
+        defaults = (None,)
     out = defaultdict(lambda: defaults)
     for p in params or ():
         with open(p) as f:
@@ -259,7 +259,6 @@ def run_test(lib, index, test_masks, out=None, err=None, args=(), gil=False, cou
             stack.enter_context(r)
             [l.append(r) for m, l in zip(mask, lists) if m]
         reports = tuple(map(multireport, lists))
-
         val, time, counts, o, e = lib.run_test(index, reports, args, gil, cout, cerr)
         out.write(o)
         err.write(e)
