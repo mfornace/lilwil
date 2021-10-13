@@ -84,7 +84,7 @@ struct Within {
 };
 
 template <class T>
-Within<T> within(T const &t) {return {t};}
+Within<T> within(T const &t) {return Within<T>(t);}
 
 /******************************************************************************/
 
