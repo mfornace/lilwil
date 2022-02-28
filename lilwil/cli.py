@@ -31,6 +31,7 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
     o(p, str, 'STR', '--params', '-p', action='append', help='JSON file for all parameters (in {"name": [packs...], ...} form; may be specified multiple times)')
     s(p, '--gil',                '-g', help='keep Python global interpeter lock on')
     s(p, '--no-signal',                help='prevent catching SIGINT signal')
+    o(p, int, 'INT', '--multiply', '-m', help='run entire test suite this number of times', default=1)
     o(p, str, '', 'tests', nargs='*',  help='test names (if not given, specifies all tests that can be run without any user-specified parameters)')
 
     r = p.add_argument_group('reporter options')
@@ -124,7 +125,7 @@ def main(run=run_suite, lib='libwil', string=None, no_default=False, failure=Fal
     quiet=False, capture=False, gil=False, exclude=False, no_color=False,
     regex=None, out='stdout', out_mode='w', xml=None, xml_mode='a+b', suite='lilwil',
     teamcity=None, json=None, json_indent=None, jobs=0, tests=None, indices=None,
-    args=None, params=None, skip=False, no_sync=None, no_signal=False):
+    args=None, params=None, skip=False, no_sync=None, no_signal=False, multiply=1):
     '''Main non-argparse function for running a subset of lilwil tests with given options'''
 
     lib = import_library(lib)
@@ -137,6 +138,7 @@ def main(run=run_suite, lib='libwil', string=None, no_default=False, failure=Fal
     names = lib.test_names()
     indices = test_indices(names, exclude=exclude, tests=tests, regex=regex, indices=indices)
     keypairs = tuple(parametrized_indices(lib, indices, load_parameters(args, params, string)))
+    keypairs *= multiply
 
     if list:
         fmt = '%{}d: %s'.format(len(str(len(names))))
