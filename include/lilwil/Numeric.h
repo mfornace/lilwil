@@ -75,7 +75,7 @@ struct Within {
 
     template <class L, class R>
     bool operator()(L const &l, R const &r) const {
-        if (l == r) return true;
+        if (l == r) {difference = l - r; return true;}
         auto const a = l - r;
         auto const b = r - l;
         difference = (a < b) ? b : a;
@@ -97,7 +97,7 @@ struct WithinLog {
 
     template <class L, class R>
     bool operator()(L const &l, R const &r) const {
-        if (l == r) return true;
+        if (l == r) {difference = l - r; return true;}
         auto const a = (l - r) / r;
         auto const b = (r - l) / l;
         difference = (a < b) ? b : a;
