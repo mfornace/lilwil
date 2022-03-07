@@ -118,12 +118,14 @@ std::invalid_argument Value::no_conversion(std::type_info const &dest) const {
 
 /******************************************************************************/
 
-Value call(std::string_view s, Context c, ArgPack pack) {
+Value BaseContext::call(std::string_view s, ArgPack pack) {
     return read_suite([&](auto const &cases) {
         auto it = std::find_if(cases.begin(), cases.end(), [=](auto const &c) {return c.name == s;});
         if (it == cases.end())
+            it = std::find_if(cases.begin(), cases.end(), [=](auto const &c) {return c.name.find(s) != std::string::npos;});
+        if (it == cases.end())
             throw std::out_of_range("Test case \"" + std::string(s) + "\" not found");
-        return it->function(c, pack);
+        return it->function(*this, pack);
     });
 }
 

@@ -19,11 +19,11 @@ struct Skip : std::runtime_error {
 
 /******************************************************************************/
 
-/// TestSignature assumes signature void(Context) if none can be deduced
+/// TestSignature assumes signature void(BaseContext) if none can be deduced
 template <class F, class=void>
-struct TestSignature : Pack<void, Context> {
-    static_assert(std::is_invocable<F, Context>(),
-        "Functor is not callable with implicit signature void(Context). "
+struct TestSignature : Pack<void, BaseContext> {
+    static_assert(std::is_invocable<F, BaseContext>(),
+        "Functor is not callable with implicit signature void(BaseContext). "
         "Specialize packs::Signature<T> for your function or use a functor with a "
         "deducable (i.e. non-template, no auto) signature");
 };
@@ -65,7 +65,7 @@ struct TestAdapter {
     using Sig = decltype(skip_first_two(TestSignature<F>()));
 
     /// Run C++ functor; logs non-ClientError and rethrows all exceptions
-    Value operator()(Context &ct, ArgPack args) {
+    Value operator()(BaseContext &ct, ArgPack args) {
         try {
             if (args.size() != Sig::size)
                 throw Skip(wrong_number_string(Sig::size, args.size()));
@@ -94,7 +94,7 @@ struct TestAdapter {
 /// Basic wrapper to make a fixed Value into a std::function
 struct ValueAdapter {
     Value value;
-    Value operator()(Context &, ArgPack const &) const {return value;}
+    Value operator()(BaseContext &, ArgPack const &) const {return value;}
 };
 
 /******************************************************************************/
@@ -111,7 +111,7 @@ struct ValueAdapter {
 
 /// A named, commented, possibly parametrized unit test case
 struct TestCase {
-    using Function = std::function<Value(Context &, ArgPack)>;
+    using Function = std::function<Value(BaseContext &, ArgPack)>;
     std::string name, comment;
     Function function;
     Vector<ArgPack> parameters;
@@ -216,16 +216,6 @@ struct AnonymousClosure {
 };
 
 /******************************************************************************/
-
-/// Call a registered unit test with type-erased arguments and output
-/// Throw std::out_of_range if test not found or test throws exception
-Value call(std::string_view s, Context c, ArgPack pack);
-
-/// Call a registered unit test with non-type-erased arguments and output
-template <class ...Ts>
-Value call(std::string_view s, Context c, Ts &&...ts) {
-    return call(s, std::move(c), Vector<Value>{make_output(static_cast<Ts &&>(ts))...});
-}
 
 /// Get a stored value from its unit test name
 /// If test not found or test does not hold a Value:

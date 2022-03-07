@@ -139,6 +139,18 @@ struct BaseContext : Base {
         }
         update_counter(e);
     }
+
+    /// Call a registered unit test with type-erased arguments and output
+    /// Throw std::out_of_range if test not found or test throws exception
+    Value call(std::string_view s, ArgPack pack);
+    
+    template <class ...Ts>
+    Value call(std::string_view s, Ts &&...ts) {
+        ArgPack args;
+        args.reserve(sizeof...(Ts));
+        (args.emplace_back(std::forward<Ts>(ts)), ...);
+        return call(s, std::move(args));
+    }
 };
 
 /******************************************************************************/
@@ -148,6 +160,9 @@ struct BaseContext : Base {
 /// class which BaseContext or Context is implicitly convertible to.
 struct Context : BaseContext {
     using BaseContext::BaseContext;
+
+    Context(BaseContext &&c) noexcept : BaseContext(std::move(c)) {}
+    Context(BaseContext const &c) noexcept : BaseContext(c) {}
 
     /**************************************************************************/
 
