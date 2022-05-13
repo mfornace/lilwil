@@ -194,7 +194,7 @@ struct Context : BaseContext {
         } else {
             auto result = std::invoke(static_cast<F &&>(f));
             auto const elapsed = std::chrono::duration<double>(Clock::now() - start).count();
-            handle(Timing, c, v, glue("seconds", elapsed));
+            handle(Timing, c, v, glue("seconds", elapsed), glue("result", result));
             return result;
         }
     }
