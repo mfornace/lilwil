@@ -180,7 +180,9 @@ def main(run=run_suite, lib='libwil', string=None, no_default=False, failure=Fal
 
         if jobs:
             from multiprocessing.pool import ThreadPool
-            exe = ThreadPool(jobs).imap # .imap() is in order, .map() is not
+            pool = ThreadPool(jobs)
+            stack.enter_context(pool)
+            exe = pool.imap # .imap() is in order, .map() is not
         else:
             exe = map
 
