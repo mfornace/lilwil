@@ -82,16 +82,17 @@ class ConsoleTestReport(Report):
         else:
             self.file, self.output = file, None
 
+        args = 'preset #%d' % args if isinstance(args, int) else str(list(args))
         if info[1]:
             if args:
-                s = '%r (%s:%d, args: %s) ' % (*info[:3], list(args))
+                s = '%r (%s:%d, args: %s) ' % (*info[:3], args)
             else:
                 s = '%r (%s:%d) ' % info[:3]
             if info[3]:
                 s += repr(info[3])
         else:
             if args:
-                s = '%r (args: %s)' % (info[0], list(args))
+                s = '%r (args: %s)' % (info[0], args)
             else:
                 s = repr(info[0])
 
