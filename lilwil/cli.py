@@ -160,7 +160,7 @@ def main(run=run_suite, lib='libwil', string=None, no_default=False, failure=Fal
             from . import console
             f = open_file(stack, out, out_mode)
             color = console.Colorer(False if no_color else f.isatty(), brief=brief)
-            r = console.ConsoleReport(f, info, color=color, timing=timing, sync=jobs > 1 and not no_sync)
+            r = console.ConsoleReport(f, info, color=color, timing=mask[3], sync=jobs > 1 and not no_sync)
             masks.append((stack.enter_context(r), mask))
 
         if xml:
