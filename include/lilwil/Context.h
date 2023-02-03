@@ -167,10 +167,9 @@ struct Context : BaseContext {
     /**************************************************************************/
 
     template <class ...Ts>
-    Context &operator()(Ts &&...ts) {
-        BaseContext::operator()(std::forward<Ts>(ts)...);
-        return *this;
-    }
+    Context &operator()(Ts &&...ts) {BaseContext::operator()(std::forward<Ts>(ts)...); return *this;}
+
+    Context &operator()(std::initializer_list<KeyValue>  const &v) {BaseContext::operator()(v); return *this;}
 
     /// Opens a new section with a reset start_time
     template <class F, class ...Ts>
@@ -215,6 +214,9 @@ struct Context : BaseContext {
         handle(b ? Success : Failure, c, v, glue("value", ok));
         return b;
     }
+
+    void finish(Comment const &c="Test succeeded", KeyPairs const &v={}) {handle(Success, c, v);}
+    void succeed(Comment const &c={}, KeyPairs const &v={}) {handle(Success, c, v);}
 
     /******************************************************************************/
 
