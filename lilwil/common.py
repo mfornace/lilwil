@@ -260,8 +260,10 @@ def run_test(lib, index, test_masks, out=None, err=None, args=(), gil=False, cou
             [l.append(r) for m, l in zip(mask, lists) if m]
         reports = tuple(map(multireport, lists))
         val, time, counts, o, e = lib.run_test(index, reports, args, gil, cout, cerr)
-        out.write(o)
-        err.write(e)
+        if out is not None:
+            out.write(o)
+        if err is not None:
+            err.write(e)
         for r, _ in test_masks:
             r.finalize(val, time, counts, o, e)
         return val, time, counts
