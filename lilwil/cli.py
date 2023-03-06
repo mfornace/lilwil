@@ -147,10 +147,12 @@ def main(run=run_suite, lib='libwil', string=None, no_default=False, failure=Fal
         print('\n(%d total tests)' % len(keypairs))
         return
 
+    # Masks signify which events will be handled or not by the main console handler
+    # JUnit and Teamcity only want the failures and exceptions so they use a separate mask
     if no_default:
-        mask = (failure, success, exception, timing, skip)
+        mask = (failure, success, exception, timing, skip, exception)
     else:
-        mask = (True, success, True, True, True)
+        mask = (True, success, True, True, True, True)
 
     info = lib.compile_info()
 
@@ -166,12 +168,12 @@ def main(run=run_suite, lib='libwil', string=None, no_default=False, failure=Fal
         if xml:
             from .junit import XMLFileReport
             r = XMLFileReport(open_file(stack, xml, xml_mode), info, suite)
-            masks.append((stack.enter_context(r), (1, 0, 1))) # failures & exceptions
+            masks.append((stack.enter_context(r), (1, 0, 1, 0, 1))) # failures & exceptions
 
         if teamcity:
             from .teamcity import TeamCityReport
             r = TeamCityReport(open_file(stack, teamcity, 'w'), info, sync=jobs > 1 and not no_sync)
-            masks.append((stack.enter_context(r), (1, 0, 1))) # failures & exceptions
+            masks.append((stack.enter_context(r), (1, 0, 1, 0, 1))) # failures & exceptions
 
         if json:
             from .native import NativeReport

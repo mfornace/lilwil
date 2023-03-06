@@ -24,6 +24,7 @@ class Event(enum.IntEnum):
     exception = 2
     timing = 3
     skipped = 4
+    traceback = 5
 
     @classmethod
     def name(cls, i):
@@ -32,7 +33,7 @@ class Event(enum.IntEnum):
         except IndexError:
             return str(i)
 
-Event.names = ('Failure', 'Success', 'Exception', 'Timing', 'Skipped')
+Event.names = ('Failure', 'Success', 'Exception', 'Timing', 'Skipped', 'Traceback')
 
 ################################################################################
 

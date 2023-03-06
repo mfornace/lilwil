@@ -74,15 +74,25 @@ class XMLTestReport(Report):
         self.time = None
         self.sub = None
         self.message = ''
+        self.traceback = []
 
     def __call__(self, event, scopes, logs):
-        self.message += readable_message(event, scopes, logs)
+        if event == Event.traceback:
+            self.traceback.extend(logs)
+            return
+        elif event == Event.exception:
+            self.traceback.extend(logs)
+            self.message += readable_message(event, scopes, self.traceback)
+            self.traceback.clear()
+        else:
+            self.message += readable_message(event, scopes, logs)
+
         if self.sub is None:
-            if event == 0:
+            if event == Event.failure:
                 self.sub = ET.SubElement(self.element, 'failure', message='', type='2')
-            if event == 2:
+            if event == Event.exception:
                 self.sub = ET.SubElement(self.element, 'error', message='', type='1')
-        self.sub.set('message', self.message + readable_message(event, scopes, logs))
+        self.sub.set('message', self.message)
 
     def finalize(self, value, time, counts, out, err):
         self.element.set('time', '%f' % time)

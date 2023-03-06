@@ -77,6 +77,7 @@ class ConsoleReport(Report):
 class ConsoleTestReport(Report):
     def __init__(self, index, args, info, file, events, color, timing=False, sync=False):
         self.color, self.timing, self.events = color, timing, events
+        self.traceback = []
         if sync:
             self.file, self.output = io.StringIO(), file
         else:
@@ -99,11 +100,19 @@ class ConsoleTestReport(Report):
         self.write(self.color.footer, self.color.test_name(index), s, '\n')
 
     def write(self, *args):
-        tuple(map(self.file.write, args))
+        for a in args:
+            self.file.write(a)
         self.file.flush()
 
     def __call__(self, event, scopes, logs):
-        self.write('\n', readable_message(self.events[event], scopes, logs, self.color.indent))
+        if event == Event.traceback:
+            self.traceback.extend(logs)
+        elif event == Event.exception:
+            self.traceback.extend(logs)
+            self.write('\n', readable_message(self.events[event], scopes, self.traceback, self.color.indent))
+            self.traceback.clear()
+        else:
+            self.write('\n', readable_message(self.events[event], scopes, logs, self.color.indent))
 
     def finalize(self, value, time, counts, out, err):
         for o, s in zip((out, err), (self.color.stdout, self.color.stderr)):

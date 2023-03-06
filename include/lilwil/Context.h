@@ -2,7 +2,7 @@
 #include "Numeric.h"
 #include "Glue.h"
 #include "Value.h"
-
+#include <iostream>
 #include "Signature.h"
 #include <functional>
 #include <atomic>
@@ -25,6 +25,7 @@ inline constexpr Event Success   = 1;
 inline constexpr Event Exception = 2;
 inline constexpr Event Timing    = 3;
 inline constexpr Event Skipped   = 4;
+inline constexpr Event Traceback = 5;
 
 /******************************************************************************/
 
@@ -143,7 +144,7 @@ struct BaseContext : Base {
     /// Call a registered unit test with type-erased arguments and output
     /// Throw std::out_of_range if test not found or test throws exception
     Value call(std::string_view s, ArgPack pack);
-    
+
     template <class ...Ts>
     Value call(std::string_view s, Ts &&...ts) {
         ArgPack args;
@@ -230,12 +231,12 @@ struct Context : BaseContext {
 
     template <class T>
     constexpr auto within(T const &tol) const {return Within<T>(tol);}
-    
+
     template <class T>
     constexpr auto within_log(T const &tol) const {return WithinLog<T>(tol);}
 
     /******************************************************************************/
-    
+
     template <class L, class R>
     bool equal(L const &l, R const &r, Comment const &c={}, KeyPairs const &v={}) {
         return require_args(unglue(l) == unglue(r), c, v, comparison_glue(l, r, Ops::eq));
@@ -325,6 +326,12 @@ struct Context : BaseContext {
     bool require_args(bool ok, Comment const &c, KeyPairs const &v, Ts &&...ts) {
         handle(ok ? Success : Failure, c, v, std::forward<Ts>(ts)...);
         return ok;
+    }
+
+    ~Context() noexcept {
+        if (!std::uncaught_exceptions()) return;
+        try {handle(Traceback, {}, {});}
+        catch (...) {}
     }
 };
 

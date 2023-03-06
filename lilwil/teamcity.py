@@ -33,20 +33,24 @@ class TeamCityReport(Report):
 class TeamCityTestReport(Report):
     '''TeamCity streaming reporter for a test case'''
     def __init__(self, messages, args, name):
+        self.traceback = []
         self.messages = messages
         self.name = name
         self.messages.testStarted(self.name)
 
     def __call__(self, event, scopes, logs):
-        if event in (Event.failure, Event.exception):
-            f = self.messages.testFailed
+        if event == Event.failure:
+            self.messages.testFailed(self.name, readable_message(event, scopes, logs))
+        elif event == Event.traceback:
+            self.traceback.extend(logs)
+        elif event == Event.exception:
+            self.traceback.extend(logs)
+            self.messages.testFailed(self.name, readable_message(event, scopes, self.traceback))
+            self.traceback.clear()
         elif event == Event.skipped:
-            f = self.messages.testSkipped
-        else:
-            return
+            self.messages.testSkipped(self.name, readable_message(event, scopes, logs))
             # maybe use customMessage(self, text, status, errorDetails='', flowId=None):
             # raise ValueError('TeamCity does not handle {}'.format(event))
-        f(self.name, readable_message(event, scopes, logs))
 
     def finalize(self, value, time, counts, out, err):
         self.messages.message('counts', errors=str(counts[0]), exceptions=str(counts[2]))
@@ -55,7 +59,6 @@ class TeamCityTestReport(Report):
         if err:
             self.messages.testStdErr(self.name, err)
         self.messages.testFinished(self.name, testDuration=datetime.timedelta(seconds=time))
-
 
 ################################################################################
 
