@@ -18,8 +18,7 @@ class TeamCityReport(Report):
         self.sync = sync
 
     def __call__(self, index, args, info):
-        cls = TeamCityLazyReport if self.sync else TeamCityTestReport
-        return cls(self.messages, args, info[0])
+        return TeamCityTestReport(self.messages, args, name=info[0], lazy=self.sync)
 
     def __enter__(self):
         self.messages.testSuiteStarted('default-suite')
@@ -32,66 +31,45 @@ class TeamCityReport(Report):
 
 class TeamCityTestReport(Report):
     '''TeamCity streaming reporter for a test case'''
-    def __init__(self, messages, args, name):
+    def __init__(self, messages, args, name, lazy):
         self.traceback = []
         self.messages = messages
         self.name = name
         self.messages.testStarted(self.name)
+        self.log = [] if lazy else None
+
+    def invoke(self, function, event, scopes, logs):
+        msg = readable_message(event, scopes, logs)
+        if self.log is None:
+            function(self.name, msg)
+        else:
+            self.log.append((function, msg))
 
     def __call__(self, event, scopes, logs):
         if event == Event.failure:
-            self.messages.testFailed(self.name, readable_message(event, scopes, logs))
+            self.invoke(self.messages.testFailed, event, scopes, logs)
         elif event == Event.traceback:
             self.traceback.extend(logs)
         elif event == Event.exception:
             self.traceback.extend(logs)
-            self.messages.testFailed(self.name, readable_message(event, scopes, self.traceback))
+            self.invoke(self.messages.testFailed, event, scopes, self.traceback)
             self.traceback.clear()
         elif event == Event.skipped:
-            self.messages.testSkipped(self.name, readable_message(event, scopes, logs))
-            # maybe use customMessage(self, text, status, errorDetails='', flowId=None):
-            # raise ValueError('TeamCity does not handle {}'.format(event))
+            self.invoke(self.messages.testIgnored, event, scopes, logs)
+        # maybe use customMessage(self, text, status, errorDetails='', flowId=None):
+        # raise ValueError('TeamCity does not handle {}'.format(event))
 
     def finalize(self, value, time, counts, out, err):
+        if self.log is not None:
+            self.messages.testStarted(self.name)
+            for function, msg in self.log:
+                function(self.name, msg)
+            self.log.clear()
         self.messages.message('counts', errors=str(counts[0]), exceptions=str(counts[2]))
         if out:
             self.messages.testStdOut(self.name, out)
         if err:
             self.messages.testStdErr(self.name, err)
-        self.messages.testFinished(self.name, testDuration=datetime.timedelta(seconds=time))
-
-################################################################################
-
-class TeamCityLazyReport(Report):
-    '''TeamCity streaming reporter for a test case'''
-    def __init__(self, messages, args, name):
-        self.messages = messages
-        self.name = name
-        self.log = []
-
-    def __call__(self, event, scopes, logs):
-        if event in (Event.failure, Event.exception):
-            f = self.messages.testFailed
-        elif event == Event.skipped:
-            f = self.messages.testSkipped
-        else:
-            return
-        self.log.append((f, self.name, readable_message(event, scopes, logs)))
-
-    def finalize(self, value, time, counts, out, err):
-        self.messages.testStarted(self.name)
-
-        for f, *args in self.log:
-            f(*args)
-        self.log.clear()
-
-        self.messages.message('counts', errors=str(counts[0]), exceptions=str(counts[2]))
-
-        if out:
-            self.messages.testStdOut(self.name, out)
-        if err:
-            self.messages.testStdErr(self.name, err)
-
         self.messages.testFinished(self.name, testDuration=datetime.timedelta(seconds=time))
 
 ################################################################################
