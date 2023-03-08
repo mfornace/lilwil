@@ -35,8 +35,11 @@ class TeamCityTestReport(Report):
         self.traceback = []
         self.messages = messages
         self.name = name
-        self.messages.testStarted(self.name)
-        self.log = [] if lazy else None
+        if lazy:
+            self.log = []
+        else:
+            self.log = None
+            self.messages.testStarted(self.name)
 
     def invoke(self, function, event, scopes, logs):
         msg = readable_message(event, scopes, logs)
