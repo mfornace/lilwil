@@ -1,4 +1,4 @@
-import io, sys, typing, datetime
+import io, os, sys, typing, datetime
 from .common import Report, readable_message, Event
 
 ################################################################################
@@ -50,6 +50,7 @@ class ConsoleReport(Report):
             self.file.write('Compile time: {}, {}\n'.format(info[1], info[2]))
         now = datetime.datetime.utcnow()
         self.file.write('Testing time: {}\n'.format(now.astimezone().strftime('%h %d %Y, %H:%M:%S')))
+        self.file.write('Process ID: {}\n'.format(os.getpid()))
         self.sync = sync
 
     def __call__(self, index, args, info):
