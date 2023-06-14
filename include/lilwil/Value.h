@@ -1,6 +1,7 @@
 #pragma once
 #include "Config.h"
 
+#include <functional>
 #include <any>
 #include <string>
 #include <stdexcept>

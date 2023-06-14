@@ -1,4 +1,5 @@
 #pragma once
+#include <typeinfo>
 #include <vector>
 #include <string_view>
 #include <string>
