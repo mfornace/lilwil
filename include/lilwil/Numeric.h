@@ -97,9 +97,10 @@ struct WithinLog {
 
     template <class L, class R>
     bool operator()(L const &l, R const &r) const {
+        using std::abs;
         if (l == r) {difference = l - r; return true;}
-        auto const a = (l - r) / r;
-        auto const b = (r - l) / l;
+        auto const a = (l - r) / abs(r);
+        auto const b = (r - l) / abs(l);
         difference = (a < b) ? b : a;
         return static_cast<bool>(difference < tolerance);
     }
