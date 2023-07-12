@@ -142,8 +142,10 @@ def test_indices(names, indices=None, exclude=False, tests=None, regex='', stric
 
 # Modify this global list as needed
 EVAL_MODULES = ['csv', 'json', 'os', 'numpy', 'pandas']
+# Modify this dict as needed (we include the following so that pasting JSON is easier)
+EVAL_VARIABLES = {'true': True, 'false': False, 'null': None}
 
-def nice_eval(string, modules=None):
+def nice_eval(string, modules=None, variables=EVAL_VARIABLES):
     '''
     Run eval() on a user's specified string
     For convenience, give them access to the whitelisted modules
@@ -160,7 +162,7 @@ def nice_eval(string, modules=None):
         except ImportError:
             pass
 
-    return eval(string, mods)
+    return eval(string, mods, variables)
 
 def load_parameters(args, params, strings):
     ''' load parameters from one of:
