@@ -35,7 +35,7 @@ struct ToString<Binary> {
     std::string operator()(Binary const &t) const {
         std::stringstream ss;
         ss << std::hex << "0x";
-        for (auto b : t) ss << b;
+        for (auto b : t.content) ss << static_cast<std::uint8_t>(b);
         return std::move(ss).str();
     }
 };
@@ -144,7 +144,7 @@ bool from_python(Value &v, Object o) {
         char *c;
         Py_ssize_t size;
         PyBytes_AsStringAndSize(+o, &c, &size);
-        v = Binary(reinterpret_cast<unsigned char const *>(c), size);
+        v = Binary{{reinterpret_cast<std::byte const *>(c), reinterpret_cast<std::byte const *>(c)+size}};
     } else if (PyUnicode_Check(+o)) { // no use of wstring for now.
         if (auto s = string_from_unicode(+o)) v = std::move(*s);
         else return false;

@@ -14,7 +14,7 @@ using Real = double;
 
 using String = std::string;
 
-using Binary = std::basic_string<unsigned char>;
+struct Binary {std::vector<std::byte> content;};
 
 struct JSON {std::string content;};
 
