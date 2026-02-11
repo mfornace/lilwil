@@ -46,6 +46,7 @@ using Handler = std::function<bool(Event, Scopes const &, KeyStrings)>;
 
 using Counter = std::atomic<std::size_t>;
 using Signal = std::atomic<bool>;
+using Seed = std::uint64_t;
 
 /******************************************************************************/
 
@@ -54,6 +55,8 @@ struct Base {
     Vector<Handler> handlers;
     /// Vector of strings making up the current Context scope
     Scopes scopes;
+    /// Seed that can be used for random number generation
+    Seed seed;
     /// Start time of the current test case or section
     typename Clock::time_point start_time;
     /// Possibly null handle to a vector of atomic counters for each Event. Test runner has responsibility for lifetime.
@@ -66,9 +69,9 @@ struct Base {
     Base() = default;
 
     /// Opens a Context and sets the start_time to the current time
-    Base(Scopes scopes, Vector<Handler> handlers, Vector<Counter> *counters=nullptr,
+    Base(Scopes scopes, Vector<Handler> handlers, Seed seed, Vector<Counter> *counters=nullptr,
         Signal const *signal=nullptr, void *metadata=nullptr)
-        : handlers(std::move(handlers)), scopes(std::move(scopes)),
+        : handlers(std::move(handlers)), scopes(std::move(scopes)), seed(seed),
           start_time(Clock::now()), counters(counters), signal(signal), metadata(metadata) {}
 
     /**************************************************************************/
@@ -175,8 +178,8 @@ struct Context : BaseContext {
     /// Opens a new section with a reset start_time
     template <class F, class ...Ts>
     auto section(std::string name, F &&functor, Ts &&...ts) const {
-        Context ctx(scopes, handlers, counters);
-        ctx.scopes.push_back(std::move(name));
+        Context ctx(scopes, handlers, seed, counters);
+        ctx.scopes.emplace_back(std::move(name));
         return static_cast<F &&>(functor)(std::move(ctx), std::forward<Ts>(ts)...);
     }
 

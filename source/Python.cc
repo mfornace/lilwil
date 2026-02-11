@@ -228,7 +228,8 @@ Value run_test(double &time, TestCase const &test, bool no_gil,
     for (auto &c : counts) c.store(0u);
 
     InterruptEntry entry;
-    Context ctx({test.name}, std::move(handlers), &counts, &*entry.iter, &lk);
+#pragma message("fix seed")
+    Context ctx({test.name}, std::move(handlers), Seed(0), &counts, &*entry.iter, &lk);
     Timer t(time);
 
     if (!test.function) throw std::runtime_error("Test case has empty std::function");
