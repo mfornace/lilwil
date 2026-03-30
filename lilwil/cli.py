@@ -33,6 +33,7 @@ def parser(prog='lilwil', lib='', suite='lilwil', jobs=1, description='Run C++ u
     s(p, '--no-signal',                help='prevent catching SIGINT signal')
     o(p, int, 'INT', '--multiply', '-m', help='run entire test suite this number of times', default=1)
     o(p, str, '', 'tests', nargs='*',  help='test names (if not given, specifies all tests that can be run without any user-specified parameters)')
+    s(p, '--fatal',                    help='stop at first error or exception')
 
     r = p.add_argument_group('reporter options')
     o(r, str, 'PATH', '--xml',         help='XML file path')
@@ -77,9 +78,12 @@ class Interrupt:
         self.lib = lib
         self.was_interrupted = False
 
-    def __call__(self, value, frame):
+    def trigger(self):
         self.lib.set_signal(True)
         self.was_interrupted = True
+
+    def __call__(self, value, frame):
+        self.trigger()
 
     def __enter__(self):
         if self.active:
@@ -91,13 +95,16 @@ class Interrupt:
 
 ################################################################################
 
-def run_suite(lib, keypairs, masks, gil, cout, cerr, signals, exe=map):
+def run_suite(lib, keypairs, masks, gil, cout, cerr, signals, fatal=False, exe=map):
     '''Run a subset of tests'''
     out, err = StringIO(), StringIO()
     interrupt = Interrupt(lib, signals)
     def f(p):
         if not interrupt.was_interrupted:
-            return run_index(lib, masks, out, err, gil, cout, cerr, p)
+            o = run_index(lib, masks, out, err, gil, cout, cerr, p)
+            if fatal and (o[2 + Event.exception] or o[2 + Event.failure]):
+                interrupt.trigger()
+            return o
 
     with interrupt:
         output = [0] * (len(Event) + 2)
@@ -122,7 +129,7 @@ def run_suite(lib, keypairs, masks, gil, cout, cerr, signals, exe=map):
 
 def main(run=run_suite, lib='libwil', string=None, no_default=False, failure=False,
     success=False, brief=False, list=False, exception=False, timing=False,
-    quiet=False, capture=False, gil=False, exclude=False, no_color=False,
+    quiet=False, capture=False, gil=False, exclude=False, no_color=False, fatal=False,
     regex=None, out='stdout', out_mode='w', xml=None, xml_mode='a+b', suite='lilwil',
     teamcity=None, json=None, json_indent=None, jobs=0, tests=None, indices=None,
     args=None, params=None, skip=False, no_sync=None, no_signal=False, multiply=1):
@@ -188,7 +195,7 @@ def main(run=run_suite, lib='libwil', string=None, no_default=False, failure=Fal
         else:
             exe = map
 
-        return run(lib=lib, keypairs=keypairs, masks=masks,
+        return run(lib=lib, keypairs=keypairs, masks=masks, fatal=fatal,
             gil=gil, cout=capture, cerr=capture, signals=not no_signal, exe=exe)
 
 

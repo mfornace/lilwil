@@ -115,11 +115,11 @@ def test_indices(names, indices=None, exclude=False, tests=None, regex='', stric
             elif strict:
                 raise KeyError('Manually specified test %r is not in the test suite' % t) from None
             else:
-                try:
-                    out.add(next(i for i, n in enumerate(names) if t in n))
-                except StopIteration:
+                candidates = [i for i, n in enumerate(names) if t in n]
+                if not candidates:
                     raise KeyError('Manually specified test %r is not in the test suite' % t) from None
-
+                ends = [i for i in candidates if names[i].endswith(t)]
+                out.update(candidates if len(candidates) == 1 or not ends else ends)
     if regex:
         import re
         pattern = re.compile(regex)

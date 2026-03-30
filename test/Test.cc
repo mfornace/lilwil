@@ -133,8 +133,8 @@ UNIT_TEST("relations") = [](lilwil::Context ct) {
 std::shared_timed_mutex mut;
 
 UNIT_TEST("shared_timed_mutex/timing") = [](auto ct) {
-    ct(HERE, "unique_lock").timing(1000, [&]{std::unique_lock<std::shared_timed_mutex> lock(mut);});
-    ct(HERE, "shared_lock").timing(1000, [&]{std::shared_lock<std::shared_timed_mutex> lock(mut);});
+    ct(HERE, "unique_lock").time(1000, [&]{std::unique_lock<std::shared_timed_mutex> lock(mut);});
+    ct(HERE, "shared_lock").time(1000, [&]{std::shared_lock<std::shared_timed_mutex> lock(mut);});
 };
 
 UNIT_TEST("pipeline/1") = [](auto ct) -> std::tuple<std::string_view, double, bool, goo> {

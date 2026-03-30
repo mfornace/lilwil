@@ -33,6 +33,7 @@ I've found that these costs are well worth it, and most of my code for the last 
 ## Contents
 
 <!-- - [lilwil](#lilwil) -->
+- [lilwil](#lilwil)
   - [Contents](#contents)
   - [Simple usage](#simple-usage)
   - [Install](#install)
@@ -313,14 +314,14 @@ return;
 
 #### Timings
 
-Timing can be done via `.timed()` or `.timing()` as follows:
+Timing can be done via `.timed()` or `.time()` as follows:
 ```c++
 // get the result of function(args...) while logging its timing
 auto function_result = ct.timed(function, args...); // may return void
 
 // get and log the time it takes to run function(args...) 10 times
 std::size_t n_repeats = 10;
-typename lilwil::Clock::duration elapsed = ct.timing(n_repeats, function, args...);
+typename lilwil::Clock::duration elapsed = ct.time(n_repeats, function, args...);
 
 // access the start time of the current test or section
 typename lilwil::Clock::time_point &start = ct.start_time;

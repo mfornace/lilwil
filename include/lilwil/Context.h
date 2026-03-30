@@ -187,6 +187,11 @@ struct Context : BaseContext {
 
     void skipped(Comment const &c={}, KeyPairs const &v={}) {handle(Skipped, c, v);}
 
+    double timing(double elapsed, Comment const &c={}, KeyPairs const &v={}) {
+        handle(Timing, c, v, glue("time", elapsed));
+        return elapsed;
+    }
+
     template <class F>
     std::invoke_result_t<F &&> timed(F &&f, Comment const &c={}, KeyPairs const &v={}) {
         auto const start = Clock::now();
@@ -203,7 +208,7 @@ struct Context : BaseContext {
     }
 
     template <class F>
-    double timing(std::size_t n, F &&f, Comment const &c={}, KeyPairs const &v={}) {
+    double time(std::size_t n, F &&f, Comment const &c={}, KeyPairs const &v={}) {
         auto const start = Clock::now();
         for (std::size_t i = 0; i != n; ++i)
             std::invoke(static_cast<F &&>(f));
