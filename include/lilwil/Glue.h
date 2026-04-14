@@ -3,6 +3,10 @@
 #include "Value.h"
 #include "Numeric.h"
 #include <string_view>
+#include <version>
+#ifdef __cpp_lib_source_location
+#    include <source_location>
+#endif
 
 namespace lilwil {
 
@@ -76,6 +80,12 @@ struct AddKeyValue<Glue<K, V>> {
 struct SourceLocation {
     std::string_view file;
     int line = 0;
+
+    constexpr SourceLocation() = default;
+    constexpr SourceLocation(std::string_view file, int line) : file(file), line(line) {}
+#ifdef __cpp_lib_source_location
+    constexpr SourceLocation(std::source_location s) : file(s.file_name()), line(s.line()) {}
+#endif
 };
 
 inline constexpr auto file_line(char const *s, int i) {return SourceLocation{s ? s : "", i};}
@@ -96,10 +106,15 @@ struct Comment {
 
     Comment(std::string_view comment, std::string_view file, int line) : comment(comment), location{file, line} {}
 
-    // change these for std::source_location when available
+#ifdef __cpp_lib_source_location
+    Comment(std::source_location loc=std::source_location::current()) : location(loc) {};
+    Comment(std::string_view comment, std::source_location loc=std::source_location::current()) : comment(comment), location(loc) {}
+    Comment(char const *comment, std::source_location loc=std::source_location::current()) : comment(comment ? comment : ""), location(loc) {}
+#else 
     Comment() = default;
     Comment(std::string_view comment) : comment(comment) {}
     Comment(char const *comment) : comment(comment ? comment : "") {}
+#endif
 };
 
 template <>
