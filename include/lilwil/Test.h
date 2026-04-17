@@ -166,6 +166,7 @@ bool anonymous_test(std::string_view name, F const &fun, Comment comment={}, Vec
 
 struct Parameters {
     Vector<ArgPack> contents;
+    Parameters() = default;
     Parameters(Vector<ArgPack> c) : contents(std::move(c)) {}
     Parameters(std::initializer_list<ArgPack> const &c) : contents(c.begin(), c.end()) {}
     void take(Parameters &&other);
