@@ -212,6 +212,11 @@ struct ToString<void const *> {
 template <>
 struct ToString<void *> : ToString<void const *> {};
 
+template <>
+struct ToString<JSON, void> {
+    std::string const &operator()(JSON const &t) const {return t.content;}
+};
+
 /******************************************************************************/
 
 }

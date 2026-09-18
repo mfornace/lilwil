@@ -51,12 +51,6 @@ struct ToString<ArrayView> {
     }
 };
 
-
-template <>
-struct ToString<JSON> {
-    std::string operator()(JSON const &t) const {return t.content;}
-};
-
 /******************************************************************************/
 
 PythonError python_error() noexcept {
