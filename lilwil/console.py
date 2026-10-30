@@ -1,4 +1,4 @@
-import io, os, sys, typing, datetime
+import io, os, sys, typing, datetime, json
 from .common import Report, readable_message, Event
 
 ################################################################################
@@ -84,7 +84,7 @@ class ConsoleTestReport(Report):
         else:
             self.file, self.output = file, None
 
-        args = 'preset #%d' % args if isinstance(args, int) else str(list(args))
+        args = 'preset #%d' % args if isinstance(args, int) else json.dumps(args)
         if info[1]:
             if args:
                 s = '%r (%s:%d, args: %s) ' % (*info[:3], args)
